@@ -135,6 +135,12 @@ npm pack                                     # 打全量包（含 405 条语音�
 * 内置语音包约 **125MB**、立绘约 **14MB**，tarball 约 **119MB**（解包约 146MB，447 个文件，
   其中 426 个是素材）。
 * 版本号改了记得同步 Release 的 tag 与文件名（`v1.19.0` / `dsh-gal-1.19.0.tgz`）。
+* **每次发版请同时传一个「不带版本号」的 asset：`dsh-gal.tgz`。** 插件收录进
+  [awesome-dsh-plugin](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin)（GitHub 上的
+  DeepSeek Harness 插件精选列表）时，条目里的 `tarball:` 指向的是
+  `releases/latest/download/dsh-gal.tgz` —— `latest/download/` 只在请求时解析 `latest`、
+  文件名照字面取，所以带版本号的名字一旦发下一版就会 404。两份都传也行（带版本号的那份
+  适合需要固定版本的场景）。
 * **想发 npm 的话**用 `node scripts/pack-npm.mjs`：它会生成一份精简包（保留 18 张立绘 +
   12 条示例语音，去掉开发脚本），约 17MB —— 全量包 125MB 的语音会超出 npm 的容量预算。
   **注意**：`scripts/verify.mjs` 里有几条断言写死了内置包的数量（18 张立绘 / 405 条语音），
