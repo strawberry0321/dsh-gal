@@ -103,3 +103,14 @@ dsh plugin --profile desktop remove dsh-gal
 | [docs/customize.md](docs/customize.md) | 素材包完整格式、`dialog.json`、定价表、全部配置项 |
 | [docs/development.md](docs/development.md) | 余额/花费算法、HTTP 接口、两类自检、打包发布、目录结构 |
 
+## 角色
+
+| 角色 | 默认立绘 | 获取方式 |
+|---|---|---|
+| **neri** | <img src="assets/packs/neri/sprites/large_neri_01face.png" width="200" alt="neri 默认立绘"> | 随插件自带 |
+| **noir音效** | <img src="assets/characters/noir.png" width="200" alt="noir 默认立绘"> | [Releases](https://github.com/strawberry0321/dsh-gal/releases/latest) 的 `noir-pack.zip` |
+| **Karuha** | <img src="assets/characters/karuha.png" width="200" alt="Karuha 默认立绘"> | [Releases](https://github.com/strawberry0321/dsh-gal/releases/latest) 的 `karuha-pack.zip` |
+
+下载解压到 `%USERPROFILE%\.dsh\dsh-gal\packs\`，刷新页面即可在设定面板的「立绘包 / 语音包」里选用。
+
+
