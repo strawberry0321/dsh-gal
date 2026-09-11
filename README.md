@@ -43,15 +43,24 @@
 里面是完整版：**18 张立绘 + 405 条语音 + 台词对照表 + 对话框/图标/音效**。
 
 ```powershell
-# 直接从这个仓库的 Release 安装（把 v1.19.0 换成你要的版本）
-dsh plugin --profile desktop add https://github.com/strawberry0321/dsh-gal/releases/download/v1.19.0/dsh-gal-1.19.0.tgz
+# 1) 到 Releases 页下载 dsh-gal-1.19.0.tgz（119MB）
+#    https://github.com/strawberry0321/dsh-gal/releases/latest
 
-# 或者先下载 tgz，再按本地文件装（离线 / 网络不稳时更稳）
+# 2) 按本地文件安装
 dsh plugin --profile desktop add C:\path\to\dsh-gal-1.19.0.tgz
 
 # 开发时用源码目录 —— link 只建目录联接，不复制素材
 dsh plugin --profile desktop add link:C:\path\to\dsh-gal
 ```
+
+> **为什么不直接写 Release 的 URL 安装？** 也能装，但 119MB 常常撞上 pnpm 默认 **60 秒**
+> 的抓取超时（实测本机 2.5MB/s 下载要 47 秒，加上跳转与 TLS 就超了）。真要一条命令搞定，
+> 先放宽超时：
+>
+> ```powershell
+> npm config set fetch-timeout 600000
+> dsh plugin --profile desktop add https://github.com/strawberry0321/dsh-gal/releases/download/v1.19.0/dsh-gal-1.19.0.tgz
+> ```
 
 **必须重启 DSH Desktop**：宿主路由和注入脚本在进程启动时装配，只刷新页面不够。
 
