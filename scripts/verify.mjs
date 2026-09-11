@@ -228,6 +228,25 @@ section('3. Script index CSV')
     assert.equal(small.count, 2)
     assert.equal(small.lines.v002.zh, '晚安')
   })
+  await check('drops inline sound cues instead of printing them', () => {
+    // The sample transcripts carry cues like `<dash=2>` in the middle of a
+    // sentence; without this the dialogue box shows the tag to the reader.
+    const cue = parseScriptIndex(
+      'clip,japanese,chinese\nv001,えいっ<dash=2>、ねいっ。,嘿<dash=2>，嘿<dash=20>。\nv002,なんで２本ともイッた<dash=6>！,干掉了<dash=12>！\n',
+    )
+    assert.equal(cue.lines.v001.ja, 'えいっ、ねいっ。', 'ja cue not stripped')
+    assert.equal(cue.lines.v001.zh, '嘿，嘿。', 'zh cue not stripped')
+    assert.equal(cue.lines.v002.ja, 'なんで２本ともイッた！')
+    assert.equal(cue.lines.v002.zh, '干掉了！')
+    // Nothing else may be touched: real punctuation and lone angle brackets stay.
+    const safe = parseScriptIndex('clip,japanese,chinese\nv003,1 < 2 です,数值 <3 也要保留\nv004,ふつう,普通\n')
+    assert.equal(safe.lines.v003.ja, '1 < 2 です')
+    assert.equal(safe.lines.v003.zh, '数值 <3 也要保留')
+    // And the shipped data itself must be clean now.
+    const shipped = parseScriptIndex(fs.readFileSync(path.join(ROOT, 'assets/packs/neri/script.csv'), 'utf8'))
+    const cueLeft = Object.values(shipped.lines).filter((l) => /<[a-z]/i.test(l.ja) || /<[a-z]/i.test(l.zh))
+    assert.equal(cueLeft.length, 0, `${cueLeft.length} shipped lines still contain a tag`)
+  })
 }
 
 section('4. Pricing')
