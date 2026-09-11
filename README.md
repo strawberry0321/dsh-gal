@@ -39,11 +39,17 @@
 
 **前置**：DSH Desktop（Profile 为 `desktop`），已配置 `DEEPSEEK_API_KEY` 凭据。
 
-```powershell
-# 从 npm（插件发布后）
-dsh plugin --profile desktop add dsh-gal
+带素材的发行包挂在 **[Releases](https://github.com/strawberry0321/dsh-gal/releases)**，
+里面是完整版：**18 张立绘 + 405 条语音 + 台词对照表 + 对话框/图标/音效**。
 
-# 或本地目录（未发布 / 开发时）—— link 只建目录联接，不复制素材
+```powershell
+# 直接从这个仓库的 Release 安装（把 v1.19.0 换成你要的版本）
+dsh plugin --profile desktop add https://github.com/strawberry0321/dsh-gal/releases/download/v1.19.0/dsh-gal-1.19.0.tgz
+
+# 或者先下载 tgz，再按本地文件装（离线 / 网络不稳时更稳）
+dsh plugin --profile desktop add C:\path\to\dsh-gal-1.19.0.tgz
+
+# 开发时用源码目录 —— link 只建目录联接，不复制素材
 dsh plugin --profile desktop add link:C:\path\to\dsh-gal
 ```
 
@@ -57,26 +63,19 @@ dsh --profile desktop --dump-config | Select-String dsh-gal
 dsh plugin --profile desktop remove dsh-gal
 ```
 
-## 完整语音包（可选）
+> 仓库源码里同样带着完整素材，`link:` 装源码和装 Release 包的效果完全一样。
 
-npm 上的 `dsh-gal` 只带 **18 张立绘 + 12 条示例语音**（体积原因，完整语音包 125MB）。
-想要全部 **405 条语音**，下载后按下面的方式放进去即可 —— 它作为一个**独立的语音包**存在，
-不会覆盖内置的立绘：
+## 素材与体积
 
-```
-%USERPROFILE%\.dsh\dsh-gal\packs\
-└── neri-voice\          ← 网盘包解压到这里（目录名就是包名）
-    ├── voices\  ner0001.wav ...  405 条
-    └── script.csv                 台词对照表
-```
+Release 包约 **119MB**（解包后 146MB），其中语音包占 125MB —— 全是示例素材，
+**不在 MIT 许可范围内**，二次分发前请换成你有权使用的东西（详见[许可](#许可)）。
 
-然后在设定面板里把 **语音包** 选成 `neri-voice`（**立绘包** 继续用 `neri`）。
+想换成自己的立绘/语音，把文件夹放进 `%USERPROFILE%\.dsh\dsh-gal\packs\` 即可，
+设定面板里会立刻多出这个包；内置示例包可以直接删掉。
 
-> **为什么另起一个包名？** 用户目录里的同名包会**整体覆盖**内置包、而不是合并 —— 如果直接往
-> `packs\neri\` 里只丢 `voices\`，内置那 18 张立绘就一起被盖掉了。分成 `neri-voice` 就恰好
-> 用上「立绘包 / 语音包分开选」这个设计。
-
-📦 完整语音包下载：**<待填：网盘链接>**
+> **同名包是整体覆盖、不是合并**：用户目录里出现叫 `neri` 的目录，哪怕只放 `voices\`，
+> 也会把内置的 `neri` 整个换掉（立绘一起消失）。只想换语音就**另起一个包名**（如
+> `neri-voice`），再用设定面板把「立绘包 / 语音包」分别选成两个包。
 
 ## 使用
 

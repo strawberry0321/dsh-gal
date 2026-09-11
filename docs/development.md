@@ -122,18 +122,23 @@ dsh-gal/
 
 ## 打包与发布
 
+**发行方式是 GitHub Releases**（带素材的完整包挂在 Release 上，用户用一条 `dsh plugin add`
+指向该 tgz 的 URL 即可安装）：
+
 ```powershell
-npm pack --pack-destination dist   # 打成本地 tarball
-npm publish                        # 发布到 npm
+npm pack                                     # 打全量包（含 405 条语音），约 119MB
+# 然后在 GitHub 上建 Release、把 tgz 作为 asset 传上去（网页拖拽或用 API）
 ```
 
 * `package.json` 的 `files` 已包含 `lib`、`scripts`、`assets/**`、`cordis.patch.yml`、
-  `docs`、`README.md`、`LICENSE`。
+  `docs`、`README.md`、`LICENSE`，所以 `npm pack` 出来的就是可直接安装的完整包。
 * 内置语音包约 **125MB**、立绘约 **14MB**，tarball 约 **119MB**（解包约 146MB，447 个文件，
   其中 426 个是素材）。
-* 介意体积的话可以只保留少量示例素材，把完整语音包交给用户自己放进
-  `%USERPROFILE%\.dsh\dsh-gal\packs\`。**注意**：`scripts/verify.mjs` 里有几条断言
-  写死了内置包的数量（18 张立绘 / 405 条语音），裁剪素材后请同步改掉，否则 CI 会红。
-* 发 GitHub 建议用 **Git LFS** 跟踪 `assets/packs/**`，或把 `assets/packs/neri/voices/`
-  加进 `.gitignore`。
+* 版本号改了记得同步 Release 的 tag 与文件名（`v1.19.0` / `dsh-gal-1.19.0.tgz`）。
+* **想发 npm 的话**用 `node scripts/pack-npm.mjs`：它会生成一份精简包（保留 18 张立绘 +
+  12 条示例语音，去掉开发脚本），约 17MB —— 全量包 125MB 的语音会超出 npm 的容量预算。
+  **注意**：`scripts/verify.mjs` 里有几条断言写死了内置包的数量（18 张立绘 / 405 条语音），
+  在裁剪过的副本里跑会失败，所以那群断言只对仓库本体有效。
 * 仓库自带 `.github/workflows/verify.yml`：推上去会自动跑两类自检，不需要装任何依赖。
+* 素材体积大，介意的话可以用 **Git LFS** 跟踪 `assets/packs/**`，或把
+  `assets/packs/neri/voices/` 加进 `.gitignore`（那样 Release 包里也要相应去掉）。

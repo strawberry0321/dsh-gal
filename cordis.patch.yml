@@ -5,8 +5,10 @@
 # 本文件把立绘挂件这一行插入 profile 的配置树。
 #
 # 安装（在任意目录执行，需要 DSH 的 dsh 命令）：
-#   dsh plugin --profile desktop add dsh-gal
-# 本地开发 / 未发布时：
+#   dsh plugin --profile desktop add https://github.com/strawberry0321/dsh-gal/releases/download/v1.19.0/dsh-gal-1.19.0.tgz
+# 或先下载 tgz 再按本地文件装：
+#   dsh plugin --profile desktop add C:\path\to\dsh-gal-1.19.0.tgz
+# 本地开发时用源码目录：
 #   dsh plugin --profile desktop add link:C:\path\to\dsh-gal
 #
 # 安装后重启 DSH Desktop 生效（宿主路由与注入脚本在进程启动时装配）。

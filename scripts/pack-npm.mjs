@@ -60,7 +60,7 @@ for (const file of sample) {
 
 // Say so in the pack itself: the settings panel shows this description.
 const packJson = JSON.parse(fs.readFileSync(path.join(pkgDir, PACK, 'pack.json'), 'utf8'))
-packJson.description = `示例立绘包：18 张立绘 + ${sample.length} 条示例语音 + 台词对照表。完整语音包（${allVoices.length} 条）见 README 的「完整语音包」一节。`
+packJson.description = `示例立绘包：18 张立绘 + ${sample.length} 条示例语音 + 台词对照表。完整语音包（${allVoices.length} 条）见 GitHub Releases 上的完整发行包。`
 fs.writeFileSync(path.join(pkgDir, PACK, 'pack.json'), `${JSON.stringify(packJson, null, 2)}\n`, 'utf8')
 
 // The published manifest: no dev scripts (they ship with the repo, not here).
