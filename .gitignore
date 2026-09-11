@@ -1,0 +1,14 @@
+# Build / packaging output
+dist/
+*.tgz
+
+# Installed dependencies (this plugin has none at runtime)
+node_modules/
+pnpm-lock.yaml
+
+# Editor / OS noise
+.vscode/
+.idea/
+Thumbs.db
+Desktop.ini
+*.log

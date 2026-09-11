@@ -1,0 +1,39 @@
+name: verify
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # The plugin has no runtime dependencies and no build step: the self-check
+      # boots the real host plugin against a fake Cordis context, so it needs
+      # nothing installed. It does need the bundled example pack to be present.
+      #
+      # NOTE: some checks assert the shipped pack's exact size (18 sprites /
+      # 405 voices). If you trim the samples before publishing, update those
+      # numbers in scripts/verify.mjs (section 7) to match.
+      - name: Run end-to-end verification
+        run: node scripts/verify.mjs
+
+      # The dialogue box's auto-fit depends on real text metrics, which cannot be
+      # modelled by hand — hand-estimated CJK advance widths repeatedly disagreed
+      # with what shipped. This drives the actual client script inside a real
+      # browser engine and measures the live DOM. It skips itself (exit 0) when no
+      # browser is installed, so `google-chrome` is set up here to exercise it.
+      - name: Set up a browser for the layout probe
+        uses: browser-actions/setup-chrome@v1
+        continue-on-error: true
+
+      - name: Measure the dialogue layout in a real browser
+        run: node scripts/layout-probe.mjs

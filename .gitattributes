@@ -1,0 +1,27 @@
+# The bundled example pack is ~140MB of PNG/WAV. If you publish this repository
+# to GitHub, track the large samples with Git LFS instead of plain Git:
+#
+#   git lfs install
+#   git lfs track "assets/packs/**/sprites/*.png"
+#   git lfs track "assets/packs/**/voices/*.wav"
+#   git add .gitattributes
+#
+# ...or drop the samples entirely and let users install their own packs into
+# %USERPROFILE%\.dsh\companion-widget\packs\ (see README).
+
+*.png  binary
+*.jpg  binary
+*.webp binary
+*.gif  binary
+*.wav  binary
+*.mp3  binary
+*.ogg  binary
+*.m4a  binary
+*.flac binary
+
+# Keep the text assets diffable.
+*.json text eol=lf
+*.js   text eol=lf
+*.mjs  text eol=lf
+*.yml  text eol=lf
+*.md   text eol=lf

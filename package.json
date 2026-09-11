@@ -1,0 +1,56 @@
+{
+  "name": "dsh-gal",
+  "version": "1.19.0",
+  "description": "dsh-gal —— DeepSeek Harness 的立绘挂件：实时显示余额与今日消耗、每轮对话结束结算 token 与花费、点击立绘随机播语音并逐字显示台词，立绘包与语音包都能换",
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "deepseek",
+    "galgame",
+    "desktop-pet",
+    "sprite",
+    "voice",
+    "balance",
+    "立绘",
+    "挂件"
+  ],
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./client": "./lib/client.js"
+  },
+  "files": [
+    "lib",
+    "scripts",
+    "assets/ui",
+    "assets/packs",
+    "assets/pricing.json",
+    "cordis.patch.yml",
+    "docs",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "verify": "node scripts/verify.mjs",
+    "probe": "node scripts/layout-probe.mjs",
+    "test": "node scripts/verify.mjs && node scripts/layout-probe.mjs"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "license": "MIT",
+  "author": "strawberry0321",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/strawberry0321/dsh-gal.git"
+  },
+  "homepage": "https://github.com/strawberry0321/dsh-gal#readme",
+  "bugs": "https://github.com/strawberry0321/dsh-gal/issues"
+}

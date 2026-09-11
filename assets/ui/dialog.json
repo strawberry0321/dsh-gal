@@ -1,0 +1,16 @@
+{
+  "_comment": "对话框底图的几何描述。crop 之外的部分是纯白空白（原图 1280x720 只有右下角一个 logo），裁掉上方空白后对话框变成一条更宽更矮的横条，同样的竖向预算下可以放得更宽，logo 也就更清晰。",
+  "_fields": {
+    "image": "原图尺寸，仅用于文档说明",
+    "crop": "显示原图的哪一块（0~1 比例）。x/y 是左上角，w/h 是宽高",
+    "inset": "文字区域相对裁切后画面四周的内边距（0~1 比例）",
+    "footer.heightRatio": "底部（余额/花费）占文字区高度的比例",
+    "footer.maxWidthRatio": "底部文字最多横向占用多少，避免压到右下角 logo",
+    "radius": "圆角像素"
+  },
+  "image": { "width": 1280, "height": 720 },
+  "crop": { "x": 0, "y": 0.42, "w": 1, "h": 0.58 },
+  "inset": { "left": 0.05, "right": 0.05, "top": 0.07, "bottom": 0.04 },
+  "footer": { "heightRatio": 0.42, "maxWidthRatio": 0.66 },
+  "radius": 10
+}

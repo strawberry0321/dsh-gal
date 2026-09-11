@@ -1,0 +1,7 @@
+{
+  "id": "neri",
+  "displayName": "ねり（Neri）",
+  "description": "默认附带的示例立绘包：18 张立绘 + 405 条语音 + 台词对照表。",
+  "defaultSprite": "large_neri_01face.png",
+  "script": "script.csv"
+}
