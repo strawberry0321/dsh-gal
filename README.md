@@ -57,6 +57,27 @@ dsh --profile desktop --dump-config | Select-String dsh-gal
 dsh plugin --profile desktop remove dsh-gal
 ```
 
+## 完整语音包（可选）
+
+npm 上的 `dsh-gal` 只带 **18 张立绘 + 12 条示例语音**（体积原因，完整语音包 125MB）。
+想要全部 **405 条语音**，下载后按下面的方式放进去即可 —— 它作为一个**独立的语音包**存在，
+不会覆盖内置的立绘：
+
+```
+%USERPROFILE%\.dsh\dsh-gal\packs\
+└── neri-voice\          ← 网盘包解压到这里（目录名就是包名）
+    ├── voices\  ner0001.wav ...  405 条
+    └── script.csv                 台词对照表
+```
+
+然后在设定面板里把 **语音包** 选成 `neri-voice`（**立绘包** 继续用 `neri`）。
+
+> **为什么另起一个包名？** 用户目录里的同名包会**整体覆盖**内置包、而不是合并 —— 如果直接往
+> `packs\neri\` 里只丢 `voices\`，内置那 18 张立绘就一起被盖掉了。分成 `neri-voice` 就恰好
+> 用上「立绘包 / 语音包分开选」这个设计。
+
+📦 完整语音包下载：**<待填：网盘链接>**
+
 ## 使用
 
 | 操作 | 结果 |
