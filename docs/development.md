@@ -130,6 +130,15 @@ npm pack                                     # 打全量包（含 405 条语音�
 # 然后在 GitHub 上建 Release、把 tgz 作为 asset 传上去（网页拖拽或用 API）
 ```
 
+日常开发不必发版，`link:` 装源码目录即可（只建目录联接、不复制 119MB 素材，改完刷新页面生效）：
+
+```powershell
+dsh plugin --profile desktop add link:C:\path\to\dsh-gal
+```
+
+> 直接把这个 Release URL 当依赖装也可以，但 119MB 容易撞上 pnpm 默认 60 秒的抓取超时；
+> 要一条命令搞定就先 `npm config set fetch-timeout 600000`。
+
 * `package.json` 的 `files` 已包含 `lib`、`scripts`、`assets/**`、`cordis.patch.yml`、
   `docs`、`README.md`、`LICENSE`，所以 `npm pack` 出来的就是可直接安装的完整包。
 * 内置语音包约 **125MB**、立绘约 **14MB**，tarball 约 **119MB**（解包约 146MB，447 个文件，

@@ -28,30 +28,14 @@
 
 ## 安装
 
-**前置**：DSH Desktop（Profile 为 `desktop`），已配置 `DEEPSEEK_API_KEY` 凭据。
+**前置**：已在 DSH 里配置好 `DEEPSEEK_API_KEY` 凭据。
 
-带素材的发行包挂在 **[Releases](https://github.com/strawberry0321/dsh-gal/releases)**，
-里面是完整版：**18 张立绘 + 405 条语音 + 台词对照表 + 对话框/图标/音效**。
+到 **[Releases](https://github.com/strawberry0321/dsh-gal/releases/latest)** 下载
+`dsh-gal-1.19.0.tgz`，然后按本地文件安装：
 
 ```powershell
-# 1) 到 Releases 页下载 dsh-gal-1.19.0.tgz（119MB）
-#    https://github.com/strawberry0321/dsh-gal/releases/latest
-
-# 2) 按本地文件安装
 dsh plugin --profile desktop add C:\path\to\dsh-gal-1.19.0.tgz
-
-# 开发时用源码目录 —— link 只建目录联接，不复制素材
-dsh plugin --profile desktop add link:C:\path\to\dsh-gal
 ```
-
-> **为什么不直接写 Release 的 URL 安装？** 也能装，但 119MB 常常撞上 pnpm 默认 **60 秒**
-> 的抓取超时（实测本机 2.5MB/s 下载要 47 秒，加上跳转与 TLS 就超了）。真要一条命令搞定，
-> 先放宽超时：
->
-> ```powershell
-> npm config set fetch-timeout 600000
-> dsh plugin --profile desktop add https://github.com/strawberry0321/dsh-gal/releases/download/v1.19.0/dsh-gal-1.19.0.tgz
-> ```
 
 **必须重启 DSH Desktop**：宿主路由和注入脚本在进程启动时装配，只刷新页面不够。
 
@@ -62,20 +46,6 @@ dsh --profile desktop --dump-config | Select-String dsh-gal
 # 卸载（会同时清掉 dependencies 和 bundles 两处记录）
 dsh plugin --profile desktop remove dsh-gal
 ```
-
-> 仓库源码里同样带着完整素材，`link:` 装源码和装 Release 包的效果完全一样。
-
-## 素材与体积
-
-Release 包约 **119MB**（解包后 146MB），其中语音包占 125MB —— 全是示例素材，
-**不在 MIT 许可范围内**（代码是 MIT，这批素材不是），二次分发前请换成你有权使用的东西。
-
-想换成自己的立绘/语音，把文件夹放进 `%USERPROFILE%\.dsh\dsh-gal\packs\` 即可，
-设定面板里会立刻多出这个包；内置示例包可以直接删掉。
-
-> **同名包是整体覆盖、不是合并**：用户目录里出现叫 `neri` 的目录，哪怕只放 `voices\`，
-> 也会把内置的 `neri` 整个换掉（立绘一起消失）。只想换语音就**另起一个包名**（如
-> `neri-voice`），再用设定面板把「立绘包 / 语音包」分别选成两个包。
 
 ## 使用
 
