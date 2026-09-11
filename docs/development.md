@@ -2,46 +2,34 @@
 
 > [README.md](../README.md) 的补充材料。
 
-## 余额与花费是怎么算出来的
+## 余额与花费怎么算
 
 ### 余额
 
 `GET https://api.deepseek.com/user/balance`，用 DSH 里配置的 `DEEPSEEK_API_KEY` 鉴权。
-结果缓存 25 秒，并发请求会合并；网络抖动时继续显示上一次的值并标注「（缓存）」。
+结果缓存 25 秒，并发请求合并；网络抖动时继续显示上一次的值并标注「（缓存）」。
 
 ### 今日已用
 
 两种来源，自动选择：
 
-1. **官方用量接口**（准确）—— 需要配置 `DEEPSEEK_PLATFORM_TOKEN`，调用
+1. **官方用量接口**（准确）—— 配置 `DEEPSEEK_PLATFORM_TOKEN` 后调用
    `platform.deepseek.com/api/v0/usage/by_api_key/amount`，按真实 token 分桶计价。
-2. **余额差额记账**（保底）—— 只需要 `DEEPSEEK_API_KEY`：每次读到余额就和上一次比较，
-   **减少的部分记为消费**，累加进当天用量；跨天自动归零并把前一天归档到 `history`。
-
-记账有两个刻意的保护：
-
-* **充值不会记成负数**：余额上升时只更新基准，不计入消费。
-* **币种切换不会记出假账**：CNY ↔ USD 跳变时只重设基准，不把汇率差当成消费。
+2. **余额差额记账**（保底）—— 只靠 `DEEPSEEK_API_KEY`：每次读到余额就和上一次比较，
+   减少的部分记为消费，累加进当天用量；跨天归零并把前一天归档。余额上升（充值）只更新
+   基准不计消费，币种跳变也只重设基准。
 
 账本文件：`%USERPROFILE%\.dsh\.dsh-gal-usage.json`
 
 ### 每轮消耗
 
-挂件监听 DSH 的 `session/event` 事件流：
+监听 DSH 的 `session/event` 事件流：
 
-* `assistant/message` 带着每一步真实的 `usage`（输入 / 缓存命中 / 输出 / 推理 token），
-  按 `(会话 id, 轮次)` 分桶累加 —— 主会话和并行子代理**不会串账**。
-* `turn/end` 时结算该会话本轮，生成一个自增的 `seq`；前端轮询到 `seq` 变化就弹对话框。
+* `assistant/message` 带每一步真实的 `usage`（输入 / 缓存命中 / 输出 / 推理 token），
+  按 `(会话 id, 轮次)` 分桶累加，主会话与并行子代理不会串账。
+* `turn/end` 结算该会话本轮，生成自增的 `seq`；前端轮询到 `seq` 变化就弹对话框。
 
-> **`seq` 怎么对齐**（`readTurnPoll`）：计数器在宿主进程里从 0 开始数，所以「页面加载**前**
-> 就已经结算的那一轮」和「马上要结算的这一轮」在前端看来长得一样 —— 前者不能弹（每次刷新都
-> 重放一遍旧收据很蠢）。规则是：bootstrap 会告诉前端**当前**计数，此后任何增加都是新的一轮；
-> 万一 bootstrap 失败，就把第一次轮询到的值当作基准，不弹。
->
-> 早期版本把「之前计数是 0」当成「这次读数只是基准」，于是**每次重启 DSH 后的第一轮对话都
-> 不弹收据** —— 而重启后的第一条，恰恰是用户最可能在盯着的那一条。
-
-计价用 DeepSeek 官方价（人民币 / 百万 token），区分高峰与空闲时段，详见
+计价用 DeepSeek 官方价（人民币 / 百万 token），区分高峰与空闲时段，见
 [customize.md 的定价表](customize.md)。
 
 ## 宿主侧 HTTP 接口
@@ -60,38 +48,21 @@
 | GET | `/dsh-gal/asset/sprite?pack=&file=` | 立绘图片 |
 | GET | `/dsh-gal/asset/voice?pack=&file=` | 语音文件 |
 
-素材路由只会返回**扫描到的文件名**，路径穿越（`../`）在结构上就不可能。
+素材路由只返回扫描到的文件名，路径穿越（`../`）在结构上就不可能。
 
 ## 两类自检
 
 ```powershell
-cd <克隆下来的 dsh-gal 目录>
-
 node scripts/verify.mjs        # 128 项端到端自检
-node scripts/layout-probe.mjs  # 真实浏览器排版探针
+node scripts/layout-probe.mjs  # 真实浏览器排版探针（无浏览器时自动跳过）
 npm test                       # 两个一起跑
 ```
 
-**`verify.mjs`** 不需要 DSH 进程、不需要联网：它用一个假的 Cordis 上下文启动**真实的宿主
-插件**，把每个 HTTP 路由都真实调用一遍，并用一个临时 `DSH_HOME` 保证不碰你的实际配置。
-覆盖 PNG 裁切、CSV 解析、定价、全部路由、用量记账、档位与配置迁移、隐形 UI 不吃点击、
-控件单位一致性、**没有内容表的语音包**、BOM 检查等。
-
-**`layout-probe.mjs`** 把**真正的 `client.js`** 装进无头 Edge/Chrome，用假 API 喂进最长
-的那条台词，再驱动**真实的档位按钮**逐档量出实际 DOM，分四种内容页各量一遍：台词要放得下，
-数字页还要**量出水平居中偏移**（取的是文字本身的包围盒，不是容器）与**文字颜色**；最后用
-一次真实的立绘点击换成**最短的那条台词**，量它有没有被放大到填满对话框。没装浏览器时自动
-跳过（exit 0）。
-
-> 为什么需要探针：对话框的自适应字号依赖**真实字体度量**，靠手算 CJK 字宽反复和实际不符。
-> 已经靠它抓到五个看代码看不出来的 bug —— 二分搜索得到 6.19px 后被 `toFixed(1)` 进位到
-> 6.2px，那 0.01px 正好把一个字挤到下一行；`clientHeight` 的整数舍入放过了 1.3px 的溢出；
-> 「CSS 断言过了、实际却没居中」——`.dsg-foot-full{max-width:none}` 写得没错，但
-> `applyLayout()` 写的**行内** `max-width` 优先级更高，数字页于是在左边 66% 的窄条里居中
-> （实测偏 −10.5px ～ −38.4px，框越大偏得越多）；「越大越好」的自适应把 1 个字的台词一路
-> 顶到 44px（10 档实测占掉对话框高度的 49%），现在由 `MAX_LINE_FONT = 28` 兜住；以及
-> **假数据比真实情况宽松**——探针原来喂的是 `seq` 1→2，而真实冷启动是 0→1，于是漏掉了
-> 「重启后第一轮不弹收据」这个 bug，现在每个阶段都要断言**屏幕上到底是哪一张内容页**。
+* **`verify.mjs`**：用一个假的 Cordis 上下文启动真实宿主插件，把每个 HTTP 路由真实调用一遍，
+  并用临时 `DSH_HOME` 保证不碰实际配置。覆盖 PNG 裁切、CSV 解析、定价、全部路由、用量记账、
+  档位与配置迁移、隐形 UI 不吃点击、控件单位一致性、没有内容表的语音包、BOM 检查等。
+* **`layout-probe.mjs`**：把真实的 `client.js` 装进无头 Edge/Chrome，驱动真实档位按钮逐档量
+  实际 DOM，分四种内容页各量一遍（是否放得下、是否居中、文字颜色、字号上限）。
 
 ## 目录结构
 
@@ -122,38 +93,22 @@ dsh-gal/
 
 ## 打包与发布
 
-**发行方式是 GitHub Releases**（带素材的完整包挂在 Release 上，用户用一条 `dsh plugin add`
-指向该 tgz 的 URL 即可安装）：
+发行方式是 **GitHub Releases**，带素材的完整包挂在 Release 上：
 
 ```powershell
-npm pack                                     # 打全量包（含 405 条语音），约 119MB
-# 然后在 GitHub 上建 Release、把 tgz 作为 asset 传上去（网页拖拽或用 API）
+npm pack                          # 打全量包，约 119MB
+# 然后在 GitHub 上建 Release，把 tgz 作为 asset 传上去
 ```
 
-日常开发不必发版，`link:` 装源码目录即可（只建目录联接、不复制 119MB 素材，改完刷新页面生效）：
+日常开发不必发版，`link:` 装源码目录即可（只建目录联接、不复制素材，改完刷新页面生效）：
 
 ```powershell
 dsh plugin --profile desktop add link:C:\path\to\dsh-gal
 ```
 
-> 直接把这个 Release URL 当依赖装也可以，但 119MB 容易撞上 pnpm 默认 60 秒的抓取超时；
-> 要一条命令搞定就先 `npm config set fetch-timeout 600000`。
-
-* `package.json` 的 `files` 已包含 `lib`、`scripts`、`assets/**`、`cordis.patch.yml`、
-  `docs`、`README.md`、`LICENSE`，所以 `npm pack` 出来的就是可直接安装的完整包。
-* 内置语音包约 **125MB**、立绘约 **14MB**，tarball 约 **119MB**（解包约 146MB，447 个文件，
-  其中 426 个是素材）。
+* `package.json` 的 `files` 已包含 `lib`、`scripts`、`assets/**`、`cordis.patch.yml`、`docs`、
+  `README.md`、`LICENSE`，`npm pack` 出来的就是可直接安装的完整包。
 * 版本号改了记得同步 Release 的 tag 与文件名（`v1.19.0` / `dsh-gal-1.19.0.tgz`）。
-* **每次发版请同时传一个「不带版本号」的 asset：`dsh-gal.tgz`。** 插件收录进
-  [awesome-dsh-plugin](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin)（GitHub 上的
-  DeepSeek Harness 插件精选列表）时，条目里的 `tarball:` 指向的是
-  `releases/latest/download/dsh-gal.tgz` —— `latest/download/` 只在请求时解析 `latest`、
-  文件名照字面取，所以带版本号的名字一旦发下一版就会 404。两份都传也行（带版本号的那份
-  适合需要固定版本的场景）。
-* **想发 npm 的话**用 `node scripts/pack-npm.mjs`：它会生成一份精简包（保留 18 张立绘 +
-  12 条示例语音，去掉开发脚本），约 17MB —— 全量包 125MB 的语音会超出 npm 的容量预算。
-  **注意**：`scripts/verify.mjs` 里有几条断言写死了内置包的数量（18 张立绘 / 405 条语音），
-  在裁剪过的副本里跑会失败，所以那群断言只对仓库本体有效。
-* 仓库自带 `.github/workflows/verify.yml`：推上去会自动跑两类自检，不需要装任何依赖。
-* 素材体积大，介意的话可以用 **Git LFS** 跟踪 `assets/packs/**`，或把
-  `assets/packs/neri/voices/` 加进 `.gitignore`（那样 Release 包里也要相应去掉）。
+* 每次发版**同时传一个不带版本号的 `dsh-gal.tgz`**：插件精选列表的条目用
+  `releases/latest/download/dsh-gal.tgz` 指向预构建包。
+* 仓库自带 `.github/workflows/verify.yml`，推上去会自动跑两类自检。

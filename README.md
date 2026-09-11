@@ -5,9 +5,6 @@
 >
 > 立绘包、语音包、图标、对话框都是普通文件夹，可以自己换。
 
-![profile](https://img.shields.io/badge/DSH-profile%20%3A%20desktop-6b7fd7)
-![license](https://img.shields.io/badge/license-MIT-blue)
-
 ![dsh-gal：界面右下角的立绘挂件，点击立绘后在对话框里逐字显示台词，再点对话框切换成余额页](assets/screenshot-1.jpg)
 
 ## 功能
@@ -79,7 +76,7 @@ dsh plugin --profile desktop remove dsh-gal
 把文件夹放进用户目录（升级不会被覆盖），设置面板里就会多出这个选项：
 
 ```
-\.dsh\dsh-gal\packs\
+%USERPROFILE%\.dsh\dsh-gal\packs\
 └── mychar\
     ├── sprites\   01.png  02.png ...     ← 立绘
     ├── voices\    my0001.wav ...         ← 语音
