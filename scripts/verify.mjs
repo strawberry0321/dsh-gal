@@ -279,6 +279,21 @@ await check('apply() registers its routes and index injection', () => {
   assert.equal(harness.listeners.size, 2)
   assert.equal(harness.effects.length, 1)
 })
+await check('creates the user drop-folders on first run', () => {
+  // The plugin only reads from the user root, so a fresh install used to leave
+  // no trace of where user packs belong.
+  const root = path.join(TMP_HOME, 'dsh-gal')
+  assert.ok(fs.existsSync(path.join(root, 'packs')), 'packs/ was not created')
+  assert.ok(fs.existsSync(path.join(root, 'packs', 'README.md')), 'the how-to README is missing')
+  assert.ok(fs.existsSync(path.join(root, 'ui')), 'ui/ was not created')
+  const readme = fs.readFileSync(path.join(root, 'packs', 'README.md'), 'utf8')
+  assert.match(readme, /sprites\//)
+  assert.match(readme, /voices\//)
+  // An existing folder must never be rewritten.
+  fs.writeFileSync(path.join(root, 'packs', 'README.md'), 'mine', 'utf8')
+  mod.apply(createHarness().ctx)
+  assert.equal(fs.readFileSync(path.join(root, 'packs', 'README.md'), 'utf8'), 'mine', 'it overwrote the user README')
+})
 await check('injects the client script into the index document', () => {
   const html = harness.indexTaps[0]('<html><body><div id="app"></div></body></html>')
   assert.ok(html.includes('<script defer src="/dsh-gal/client.js"></script>'))

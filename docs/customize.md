@@ -4,7 +4,10 @@
 
 ## 放哪里
 
-| 内容 | 用户目录（推荐，升级不丢） | 插件内置目录 |
+首次运行时插件会建好 `%USERPROFILE%\.dsh\dsh-gal\`，里面有 `packs\`（附一份格式速查）和 `ui\`，
+把文件丢进去即可；用户目录优先，且插件升级不会被冲掉。
+
+| 内容 | 用户目录 | 插件内置目录 |
 |---|---|---|
 | 立绘包 / 语音包 | `%USERPROFILE%\.dsh\dsh-gal\packs\` | `<插件目录>\assets\packs\` |
 | 对话框图片 | `%USERPROFILE%\.dsh\dsh-gal\ui\dialog.png` | `<插件目录>\assets\ui\dialog.png` |
@@ -13,9 +16,9 @@
 | 点击音效 | `%USERPROFILE%\.dsh\dsh-gal\ui\click.wav` | `<插件目录>\assets\ui\click.wav` |
 | 定价表 | `%USERPROFILE%\.dsh\dsh-gal\pricing.json` | `<插件目录>\assets\pricing.json` |
 
-用户目录优先，且插件升级不会被冲掉。**包是整体覆盖、不是合并**：用户目录里出现叫 `neri`
-的目录，哪怕只放 `voices\`，也会把内置的 `neri` 整个换掉。只想补语音就另起一个包名
-（如 `neri-voice`），再用设定面板把「立绘包 / 语音包」分别选成两个包。
+**包是整体覆盖、不是合并**：用户目录里出现叫 `neri` 的目录，哪怕只放 `voices\`，也会把内置的
+`neri` 整个换掉。只想补语音就另起一个包名（如 `neri-voice`），再用设定面板把「立绘包 / 语音包」
+分别选成两个包。改完刷新页面生效。
 
 ## 立绘包 / 语音包
 
