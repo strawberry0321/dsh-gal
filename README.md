@@ -68,7 +68,7 @@ dsh plugin --profile desktop remove dsh-gal
 ## 素材与体积
 
 Release 包约 **119MB**（解包后 146MB），其中语音包占 125MB —— 全是示例素材，
-**不在 MIT 许可范围内**，二次分发前请换成你有权使用的东西（详见[许可](#许可)）。
+**不在 MIT 许可范围内**（代码是 MIT，这批素材不是），二次分发前请换成你有权使用的东西。
 
 想换成自己的立绘/语音，把文件夹放进 `%USERPROFILE%\.dsh\dsh-gal\packs\` 即可，
 设定面板里会立刻多出这个包；内置示例包可以直接删掉。
@@ -109,7 +109,7 @@ Release 包约 **119MB**（解包后 146MB），其中语音包占 125MB —— 
 把文件夹放进用户目录（升级不会被覆盖），设置面板里就会多出这个选项：
 
 ```
-%USERPROFILE%\.dsh\dsh-gal\packs\
+\.dsh\dsh-gal\packs\
 └── mychar\
     ├── sprites\   01.png  02.png ...     ← 立绘
     ├── voices\    my0001.wav ...         ← 语音
@@ -127,24 +127,6 @@ Release 包约 **119MB**（解包后 146MB），其中语音包占 125MB —— 
 完整格式（`script.csv` 列名、`pack.json` 字段、换对话框底图、定价表）见
 **[docs/customize.md](docs/customize.md)**。
 
-## 常见问题
-
-**重启后挂件没出现？** 按顺序查：① `dsh --profile desktop --dump-config | Select-String dsh-gal`
-有没有输出；② `%USERPROFILE%\.dsh\profiles\desktop\node_modules\dsh-gal` 是否存在；
-③ 浏览器控制台有没有 `/dsh-gal/client.js` 的加载错误；④ 必须**重启 DSH Desktop**。
-
-**显示「余额 --」？** 挂件通过 DSH 凭据服务读 `DEEPSEEK_API_KEY`，在 DSH 里配好即可。
-想让「今日已用」更准，再配一个 `DEEPSEEK_PLATFORM_TOKEN`。
-
-**点立绘没声音？** 浏览器会拦截未经用户交互的自动播放；点击立绘本身算交互，正常有声。
-另外检查设定面板里的**音量**是不是 0%。
-
-**对话框怎么自己消失了 / 怎么让它常驻？** 这是设计行为（语音播完停 3 秒）。把
-`%USERPROFILE%\.dsh\.dsh-gal.json` 里的 `dialogHoldSeconds` 调大即可，上限 `120`
-（约 2 分钟，实际上已经等于常驻；超过上限会被自动夹回 120）。**唯一的例外是每轮结算的
-收据：它固定停 5 秒**，不跟随这个配置。
-
-更多问题见 **[docs/usage.md](docs/usage.md)**。
 
 ## 文档
 
@@ -154,19 +136,3 @@ Release 包约 **119MB**（解包后 146MB），其中语音包占 125MB —— 
 | [docs/customize.md](docs/customize.md) | 素材包完整格式、`dialog.json`、定价表、全部配置项 |
 | [docs/development.md](docs/development.md) | 余额/花费算法、HTTP 接口、两类自检、打包发布、目录结构 |
 
-## 开发
-
-零依赖、零构建：宿主侧是普通 ESM，浏览器侧是一段原样吐给页面的脚本。
-
-```powershell
-node scripts/verify.mjs        # 128 项端到端自检（假 Cordis 上下文启动真实插件）
-node scripts/layout-probe.mjs  # 真实浏览器排版探针（无浏览器时自动跳过）
-npm test                       # 两个一起跑
-```
-
-## 许可
-
-代码 **MIT**。`assets/` 下附带的示例立绘、语音、对话框、图标**不在 MIT 范围内**，
-只为「装上就能用」而随包附带 —— **二次分发前请替换成你有权使用的素材**。
-把自己的立绘包放进 `%USERPROFILE%\.dsh\dsh-gal\packs\` 再在设定面板里选中即可，
-内置包可以整个删掉。
