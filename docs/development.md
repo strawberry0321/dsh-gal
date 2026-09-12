@@ -54,14 +54,15 @@
 ## 两类自检
 
 ```powershell
-node scripts/verify.mjs        # 139 项端到端自检
+node scripts/verify.mjs        # 146 项端到端自检
 node scripts/layout-probe.mjs  # 真实浏览器排版探针（无浏览器时自动跳过）
 npm test                       # 两个一起跑
 ```
 
 * **`verify.mjs`**：用一个假的 Cordis 上下文启动真实宿主插件，把每个 HTTP 路由真实调用一遍，
   并用临时 `DSH_HOME` 保证不碰实际配置。覆盖 PNG 裁切、CSV 解析、定价、全部路由、用量记账、
-  档位与配置迁移、隐形 UI 不吃点击、控件单位一致性、没有内容表的语音包、换底图全流程、BOM 检查等。
+  档位与配置迁移、隐形 UI 不吃点击、控件单位一致性、没有内容表的语音包、换底图全流程、
+  中英日三种包目录名、素材 URL 版本号、BOM 检查等。
 * **`layout-probe.mjs`**：把真实的 `client.js` 装进无头 Edge/Chrome，驱动真实档位按钮逐档量
   实际 DOM，**自带底图与空白底图各量一遍**（是否放得下、是否居中、文字颜色、字号上限，
   以及空白底图的图形区是否真的用满了整块）；每遍最后再走一次设定面板的换底图流程
@@ -90,9 +91,10 @@ dsh-gal/
 │       ├── README.md         # 包格式说明
 │       └── neri/             # 内置示例包：pack.json / script.csv / 18 张立绘 / 405 条语音
 └── scripts/
-    ├── verify.mjs            # 139 项端到端自检
+    ├── verify.mjs            # 146 项端到端自检
     ├── layout-probe.mjs      # 真实浏览器排版探针
-    └── make-blank-plate.mjs  # 生成自带的空白底图（png + json）
+    ├── make-blank-plate.mjs  # 生成自带的空白底图（png + json）
+    └── mirror-sprites.mjs    # 无损左右镜像一整套立绘（写完逐像素回验）
 ```
 
 ## 打包与发布
@@ -112,7 +114,10 @@ dsh plugin --profile desktop add link:C:\path\to\dsh-gal
 
 * `package.json` 的 `files` 已包含 `lib`、`scripts`、`assets/**`、`cordis.patch.yml`、`docs`、
   `README.md`、`LICENSE`，`npm pack` 出来的就是可直接安装的完整包。
-* 版本号改了记得同步 Release 的 tag 与文件名（`v2.0.0` / `dsh-gal-2.0.0.tgz`）。
+* 版本号改了记得同步 Release 的 tag 与文件名（`v2.1.0` / `dsh-gal-2.1.0.tgz`）。
 * 每次发版**同时传一个不带版本号的 `dsh-gal.tgz`**：README 的安装步骤和插件精选列表的条目都用
   `releases/latest/download/dsh-gal.tgz` 指向预构建包，所以它必须和新版一起传。
+* 角色素材包（`noir-pack.zip` / `karuha-pack.zip` / `mashiro-pack.zip`）名字里**不带版本号**，
+  同样只有最新版能对外提供：发新版时要一起传，旧版上的副本可以删掉（省一半以上空间）。
+  素材包的目录布局用 `sprites/` + `voices/`，这样在只认英文目录名的老版本上也能装。
 * 仓库自带 `.github/workflows/verify.yml`，推上去会自动跑两类自检。

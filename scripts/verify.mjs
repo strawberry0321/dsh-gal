@@ -436,6 +436,52 @@ section('7b. Default sprite resolution')
     return pack
   }
 
+  await check('a pack may keep its folders in Chinese or Japanese', () => {
+    // A pack assembled by hand naturally comes out as 立绘/ + 语音/ (or 立ち絵/ +
+    // ボイス/). Being forced to rename folders before the plugin will look at them
+    // is the kind of papercut that makes a feature feel broken.
+    const localised = (name, spriteDir, voiceDir) => {
+      const dir = path.join(sandbox, name)
+      fs.mkdirSync(path.join(dir, spriteDir), { recursive: true })
+      fs.mkdirSync(path.join(dir, voiceDir), { recursive: true })
+      fs.writeFileSync(path.join(dir, spriteDir, 'a.png'), PIXEL)
+      fs.writeFileSync(path.join(dir, voiceDir, 'a.wav'), Buffer.from('RIFF____WAVE'))
+      fs.writeFileSync(path.join(dir, voiceDir, 'script.csv'), 'clip,japanese,chinese\na,こんにちは,你好\n', 'utf8')
+      fs.writeFileSync(path.join(dir, 'pack.json'), JSON.stringify({ defaultSprite: 'a.png' }), 'utf8')
+      return dir
+    }
+    localised('zhpack', '立绘', '语音')
+    localised('jppack', '立ち絵', 'ボイス')
+
+    const registry = createPackRegistry({ roots: [sandbox] })
+    for (const [id, name] of [['zhpack', '立绘/语音'], ['jppack', '立ち絵/ボイス']]) {
+      const pack = registry.all().find((p) => p.id === id)
+      assert.ok(pack, `${name}: the pack was not scanned`)
+      assert.equal(pack.sprites.length, 1, `${name}: artwork not found`)
+      assert.equal(pack.voices.length, 1, `${name}: audio not found`)
+      assert.equal(pack.scriptCount, 1, `${name}: the CSV inside the voice folder must be found too`)
+      assert.equal(pack.defaultSprite, 'a.png', `${name}: the declared default was ignored`)
+      assert.ok(pack.spriteDir.endsWith(name.split('/')[0]), `${name}: wrong sprite dir`)
+    }
+  })
+
+  await check('the English folder names still win when both exist', () => {
+    // Order matters: an existing pack must not change meaning because a second
+    // folder appeared beside it.
+    const dir = path.join(sandbox, 'both')
+    for (const sub of ['sprites', '立绘', 'voices', '语音']) {
+      fs.mkdirSync(path.join(dir, sub), { recursive: true })
+    }
+    fs.writeFileSync(path.join(dir, 'sprites', 'english.png'), PIXEL)
+    fs.writeFileSync(path.join(dir, '立绘', 'chinese.png'), PIXEL)
+    fs.writeFileSync(path.join(dir, 'voices', 'english.wav'), Buffer.from('RIFF____WAVE'))
+    fs.writeFileSync(path.join(dir, '语音', 'chinese.wav'), Buffer.from('RIFF____WAVE'))
+    const pack = createPackRegistry({ roots: [sandbox] }).all().find((p) => p.id === 'both')
+    assert.deepEqual(pack.sprites, ['english.png'], 'sprites/ must stay the first choice')
+    assert.deepEqual(pack.voices, ['english.wav'], 'voices/ must stay the first choice')
+    fs.rmSync(dir, { recursive: true, force: true })
+  })
+
   await check('a file merely called Default carries no special meaning', () => {
     // The naming convention was dropped: pack.json is the way to declare a
     // default, so `Default.png` is just another sprite.

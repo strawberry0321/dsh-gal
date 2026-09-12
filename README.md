@@ -90,6 +90,7 @@ dsh plugin --profile desktop remove dsh-gal
     └── pack.json                         ← 可选：显示名 / 默认立绘 / 裁切
 ```
 
+* 两个文件夹也可以叫 `立绘\` / `语音\`（或 `立ち絵\` / `ボイス\`），插件都认，不用改名。
 * 只放 `sprites\` 就是立绘包，只放 `voices\` 就是语音包。
 * 语音包**不放 `script.csv`** 就是「只有语音没有台词」：点击立绘照常出声、照常换立绘，
   对话框改为显示「余额 / 今日已用」。
@@ -113,6 +114,7 @@ dsh plugin --profile desktop remove dsh-gal
 | 角色 | 默认立绘 | 获取方式 |
 |---|---|---|
 | **neri** | <img src="assets/packs/neri/sprites/large_neri_01face.png" width="200" alt="neri 默认立绘"> | 随插件自带 |
+| **Mashiro** | <img src="assets/characters/mashiro.png" width="200" alt="Mashiro 默认立绘"> | [Releases](https://github.com/strawberry0321/dsh-gal/releases/latest) 的 `mashiro-pack.zip` |
 | **noir音效** | <img src="assets/characters/noir.png" width="200" alt="noir 默认立绘"> | [Releases](https://github.com/strawberry0321/dsh-gal/releases/latest) 的 `noir-pack.zip` |
 | **Karuha** | <img src="assets/characters/karuha.png" width="200" alt="Karuha 默认立绘"> | [Releases](https://github.com/strawberry0321/dsh-gal/releases/latest) 的 `karuha-pack.zip` |
 
