@@ -283,6 +283,28 @@ ${clientSource}
         // Opening the panel pins the dialogue box so it cannot hide mid-run.
         gear.dispatchEvent(new MouseEvent('click', { bubbles: true }));
         await tick(80);
+        // The plate controls have to be reachable: laid out inside the panel
+        // (not overflowing its 272px width) and the file input out of the way.
+        var panelEl = q('.dsg-panel');
+        var panelRect = panelEl.getBoundingClientRect();
+        var gearRow = ['plate-pick', 'plate-blank', 'plate-default'].map(function (act) {
+          var el = q('[data-act="' + act + '"]');
+          var r = el.getBoundingClientRect();
+          return {
+            act: act,
+            w: Math.round(r.width),
+            h: Math.round(r.height),
+            inside: r.left >= panelRect.left - 1 && r.right <= panelRect.right + 1,
+            scrolls: r.top >= panelRect.top - 1 && r.bottom <= panelRect.bottom + 1,
+          };
+        });
+        var fileEl = q('[data-act="plate-file"]');
+        out.panel = {
+          rows: gearRow,
+          fileHidden: getComputedStyle(fileEl).display === 'none',
+          fileAccept: fileEl.getAttribute('accept'),
+          info: (q('[data-val="plate-info"]').textContent || '').trim(),
+        };
         var dec = q('[data-act="dialog-scale-dec"]');
         var inc = q('[data-act="dialog-scale-inc"]');
         var val = q('[data-val="dialog-scale"]');
@@ -433,6 +455,8 @@ const run = spawnSync(
     '--window-size=1920,1080',
     '--virtual-time-budget=30000',
     '--dump-dom',
+    // Set DSG_PROBE_SHOT to also leave a screenshot of the open panel behind.
+    ...(process.env.DSG_PROBE_SHOT ? [`--screenshot=${process.env.DSG_PROBE_SHOT}`] : []),
     `file:///${page.replace(/\\/g, '/')}`,
   ],
   { encoding: 'utf8', timeout: 120000, maxBuffer: 32 * 1024 * 1024 },
@@ -549,6 +573,30 @@ const summary = Object.entries(result.phases).map(([phase, rows]) => {
 plateSummaries.push(`${plate.geometry.image.width}x${plate.geometry.image.height} → ${summary.join('   |   ')}`)
 console.log(summary.join('   |   '))
 console.log('比允许下限更小的档位按预期截断，并显示淡出提示')
+
+// The plate controls, as laid out in the real panel.
+const panelProbe = result.panel
+if (!panelProbe) {
+  console.log('设定面板：换底图那一行没找到')
+  failures++
+} else {
+  const bad = panelProbe.rows.filter((r) => r.w <= 0 || r.h <= 0 || !r.inside)
+  const scrolled = panelProbe.rows.filter((r) => !r.scrolls)
+  const problems = []
+  if (bad.length) problems.push(`按钮没排进面板：${bad.map((r) => r.act).join(', ')}`)
+  if (scrolled.length) problems.push(`默认滚出可视区：${scrolled.map((r) => r.act).join(', ')}`)
+  if (!panelProbe.fileHidden) problems.push('文件输入没有隐藏，会露出一个原生控件')
+  if (!/image\/png/.test(panelProbe.fileAccept || '')) problems.push('文件选择器没有限定图片类型')
+  if (!/\d+×\d+/.test(panelProbe.info)) problems.push(`底图状态行没显示尺寸（${panelProbe.info}）`)
+  if (problems.length) {
+    console.log(`设定面板：${problems.join('，')}`)
+    failures++
+  } else {
+    console.log(
+      `设定面板：三个底图按钮都在面板内（${panelProbe.rows.map((r) => `${r.act} ${r.w}x${r.h}`).join('，')}），状态行「${panelProbe.info}」`,
+    )
+  }
+}
 
 // A plate with nothing in the corner must actually hand the figures the freed
 // band: if `logoShare` were ignored, the receipt would still stop at 72% and this
