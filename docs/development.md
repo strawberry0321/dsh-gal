@@ -54,7 +54,7 @@
 ## 两类自检
 
 ```powershell
-node scripts/verify.mjs        # 146 项端到端自检
+node scripts/verify.mjs        # 156 项端到端自检
 node scripts/layout-probe.mjs  # 真实浏览器排版探针（无浏览器时自动跳过）
 npm test                       # 两个一起跑
 ```
@@ -62,7 +62,7 @@ npm test                       # 两个一起跑
 * **`verify.mjs`**：用一个假的 Cordis 上下文启动真实宿主插件，把每个 HTTP 路由真实调用一遍，
   并用临时 `DSH_HOME` 保证不碰实际配置。覆盖 PNG 裁切、CSV 解析、定价、全部路由、用量记账、
   档位与配置迁移、隐形 UI 不吃点击、控件单位一致性、没有内容表的语音包、换底图全流程、
-  中英日三种包目录名、素材 URL 版本号、BOM 检查等。
+  中英日三种包目录名、素材 URL 版本号、语音洗牌池与 weights.json、BOM 检查等。
 * **`layout-probe.mjs`**：把真实的 `client.js` 装进无头 Edge/Chrome，驱动真实档位按钮逐档量
   实际 DOM，**自带底图与空白底图各量一遍**（是否放得下、是否居中、文字颜色、字号上限，
   以及空白底图的图形区是否真的用满了整块）；每遍最后再走一次设定面板的换底图流程
@@ -79,7 +79,7 @@ dsh-gal/
 ├── lib/
 │   ├── index.js              # 宿主：路由、余额/用量、每轮结算、index 注入
 │   ├── client.js             # 浏览器：挂件 UI、拖拽、设定面板、对话框、打字机
-│   ├── packs.js              # 立绘包 / 语音包扫描与随机抽取
+│   ├── packs.js              # 立绘包 / 语音包扫描、权重、洗牌池抽取
 │   ├── csv.js                # 台词对照表解析（支持跨行引号字段）
 │   ├── pricing.js            # DeepSeek 官方定价 + 峰谷时段
 │   ├── usage.js              # 余额接口 + 差额记账
@@ -91,7 +91,7 @@ dsh-gal/
 │       ├── README.md         # 包格式说明
 │       └── neri/             # 内置示例包：pack.json / script.csv / 18 张立绘 / 405 条语音
 └── scripts/
-    ├── verify.mjs            # 146 项端到端自检
+    ├── verify.mjs            # 156 项端到端自检
     ├── layout-probe.mjs      # 真实浏览器排版探针
     ├── make-blank-plate.mjs  # 生成自带的空白底图（png + json）
     └── mirror-sprites.mjs    # 无损左右镜像一整套立绘（写完逐像素回验）

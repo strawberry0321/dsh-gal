@@ -283,11 +283,11 @@ ${clientSource}
         // Opening the panel pins the dialogue box so it cannot hide mid-run.
         gear.dispatchEvent(new MouseEvent('click', { bubbles: true }));
         await tick(80);
-        // The plate controls have to be reachable: laid out inside the panel
-        // (not overflowing its 272px width) and the file input out of the way.
+        // The plate and voice-order controls have to be reachable: laid out inside
+        // the panel (not overflowing its 272px width) and the file input out of the way.
         var panelEl = q('.dsg-panel');
         var panelRect = panelEl.getBoundingClientRect();
-        var gearRow = ['plate-pick', 'plate-blank', 'plate-default'].map(function (act) {
+        var gearRow = ['plate-pick', 'plate-blank', 'plate-default', 'voice-order'].map(function (act) {
           var el = q('[data-act="' + act + '"]');
           var r = el.getBoundingClientRect();
           return {
@@ -593,7 +593,7 @@ if (!panelProbe) {
     failures++
   } else {
     console.log(
-      `设定面板：三个底图按钮都在面板内（${panelProbe.rows.map((r) => `${r.act} ${r.w}x${r.h}`).join('，')}），状态行「${panelProbe.info}」`,
+      `设定面板：底图与语音顺序按钮都在面板内（${panelProbe.rows.map((r) => `${r.act} ${r.w}x${r.h}`).join('，')}），状态行「${panelProbe.info}」`,
     )
   }
 }

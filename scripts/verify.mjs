@@ -631,6 +631,170 @@ await check('a voice-only pack still plays, it just has no line to print', async
   await put({ voicePack: 'neri' })
 })
 
+section('8c. Voice draw order (shuffle bag) and weights')
+{
+  const { createPackRegistry, planVoiceRound, voiceSlots } = await import('../lib/packs.js')
+  // Packs have to land in the real user root, or the running plugin never sees
+  // them and the checks quietly measure the shipped pack instead.
+  const packRoot = path.join(TMP_HOME, 'dsh-gal', 'packs')
+  const madePacks = []
+  const put = (patch) => callRoute(route('/dsh-gal/api/config'), '/dsh-gal/api/config', { method: 'PUT', body: JSON.stringify(patch) })
+
+  /** A pack of `n` clips, each with a transcript line of its own. */
+  const makeVoicePack = (id, n, weights) => {
+    const dir = path.join(packRoot, id)
+    madePacks.push(dir)
+    fs.mkdirSync(path.join(dir, 'voices'), { recursive: true })
+    const rows = ['clip,japanese,chinese']
+    for (let i = 1; i <= n; i++) {
+      const clip = `clip${String(i).padStart(4, '0')}`
+      fs.writeFileSync(path.join(dir, 'voices', `${clip}.wav`), Buffer.from('RIFF____WAVEfmt '))
+      rows.push(`${clip},セリフ${i},台词${i}`)
+    }
+    fs.writeFileSync(path.join(dir, 'voices', 'script.csv'), rows.join('\n'), 'utf8')
+    if (weights) fs.writeFileSync(path.join(dir, 'weights.json'), JSON.stringify(weights, null, 2), 'utf8')
+    return dir
+  }
+  const cleanPacks = async () => {
+    await put({ voicePack: 'neri' })
+    for (const dir of madePacks) fs.rmSync(dir, { recursive: true, force: true })
+  }
+
+  await check('a round covers every line exactly once', () => {
+    // The whole point: no line comes back until every other line has had a turn,
+    // so "this one plays all the time" cannot happen by chance.
+    let seed = 7
+    const rng = () => {
+      seed = (seed * 1103515245 + 12345) % 2147483648
+      return seed / 2147483648
+    }
+    const files = Array.from({ length: 40 }, (_, i) => `c${i}`)
+    const round = planVoiceRound(files, () => 1, { random: rng })
+    assert.equal(round.length, 40)
+    assert.equal(new Set(round).size, 40, 'a line was planned twice in one round')
+    assert.ok(!round.some((f, i) => i > 0 && f === round[i - 1]), 'two identical neighbours in one round')
+  })
+
+  await check('a new round never opens with the line that closed the last', () => {
+    const files = ['a', 'b', 'c', 'd']
+    for (let i = 0; i < 50; i++) {
+      const previous = files[i % files.length]
+      const round = planVoiceRound(files, () => 1, { previous })
+      assert.notEqual(round[0], previous, 'the seam repeat is audible exactly like any other repeat')
+    }
+  })
+
+  await check('weights turn into whole slots without losing their ratio', () => {
+    assert.deepEqual(voiceSlots([1, 1, 1]), [1, 1, 1])
+    assert.deepEqual(voiceSlots([1, 1, 0.25]), [4, 4, 1], 'a fractional weight must survive')
+    assert.deepEqual(voiceSlots([5, 1, 1]), [5, 1, 1])
+    assert.deepEqual(voiceSlots([0, 1, 1]), [0, 1, 1], 'weight 0 means never')
+    assert.deepEqual(voiceSlots([0, 0, 0]), [1, 1, 1], 'all-muted falls back to normal, never silence')
+    const capped = voiceSlots([1e6, 1, 1]).reduce((a, b) => a + b, 0)
+    assert.ok(capped <= 20000, `a wild weight produced ${capped} slots`)
+  })
+
+  await check('the bag is drawn in order, and refills itself', async () => {
+    makeVoicePack('bagpack', 12)
+    await put({ voicePack: 'bagpack', voiceOrder: 'shuffle', spritePack: 'neri' })
+    const seen = []
+    for (let i = 0; i < 12; i++) {
+      const data = jsonOf(await callRoute(route('/dsh-gal/api/next'), '/dsh-gal/api/next', { query: { voicePack: 'bagpack' } }))
+      seen.push(data.voice.clip)
+    }
+    assert.equal(new Set(seen).size, 12, `one round must cover all 12 lines, got ${new Set(seen).size}`)
+    // The thirteenth click starts the next round on its own — nothing to restart.
+    const next = jsonOf(await callRoute(route('/dsh-gal/api/next'), '/dsh-gal/api/next', { query: { voicePack: 'bagpack' } }))
+    assert.notEqual(next.voice.clip, seen[11], 'the refilled round opened with the line that just played')
+    const again = []
+    for (let i = 0; i < 11; i++) {
+      again.push(jsonOf(await callRoute(route('/dsh-gal/api/next'), '/dsh-gal/api/next', { query: { voicePack: 'bagpack' } })).voice.clip)
+    }
+    assert.equal(new Set([...again, next.voice.clip]).size, 12, 'the second round must cover all 12 too')
+  })
+
+  await check('random order is still available and still clusters', async () => {
+    await put({ voiceOrder: 'random' })
+    const seen = []
+    for (let i = 0; i < 60; i++) {
+      const data = jsonOf(await callRoute(route('/dsh-gal/api/next'), '/dsh-gal/api/next', { query: { voicePack: 'bagpack' } }))
+      seen.push(data.voice.clip)
+    }
+    // 60 draws from 12 lines: the old rule repeats freely, which is exactly what
+    // the option exists to preserve.
+    assert.ok(new Set(seen).size < 12 * 5, 'random order should be able to repeat within 60 draws')
+    await put({ voiceOrder: 'shuffle' })
+  })
+
+  await check('weights.json changes how often a line comes up', async () => {
+    makeVoicePack('weightpack', 6, { clip0001: 3, clip0002: 0 })
+    // A config write re-scans the packs, so the new file is picked up.
+    await put({ voicePack: 'weightpack' })
+    const listed = jsonOf(await callRoute(route('/dsh-gal/api/packs'), '/dsh-gal/api/packs'))
+    const summary = listed.voicePacks.find((p) => p.id === 'weightpack')
+    assert.equal(summary.weightedVoiceCount, 2, 'both the boosted and the muted line count as weighted')
+
+    const counts = new Map()
+    for (let i = 0; i < 200; i++) {
+      const data = jsonOf(await callRoute(route('/dsh-gal/api/next'), '/dsh-gal/api/next', { query: { voicePack: 'weightpack' } }))
+      counts.set(data.voice.clip, (counts.get(data.voice.clip) || 0) + 1)
+    }
+    assert.ok(!counts.has('clip0002'), 'weight 0 must never be played')
+    const heavy = counts.get('clip0001') || 0
+    const light = counts.get('clip0003') || 0
+    assert.ok(heavy > light * 2, `weight 3 should be heard about three times as often (${heavy} vs ${light})`)
+  })
+
+  await check('a line of dialogue can be weighted as a whole, unmatched', async () => {
+    makeVoicePack('textpack', 4, { 台词2: 0 })
+    await put({ voicePack: 'textpack' })
+    const clips = new Set()
+    for (let i = 0; i < 60; i++) {
+      const data = jsonOf(await callRoute(route('/dsh-gal/api/next'), '/dsh-gal/api/next', { query: { voicePack: 'textpack' } }))
+      clips.add(data.voice.clip)
+    }
+    assert.ok(!clips.has('clip0002'), 'the line named by its text must be muted')
+    assert.equal(clips.size, 3, 'the other three must still play')
+  })
+
+  await check('a broken weights file is ignored, never fatal', async () => {
+    const dir = makeVoicePack('brokenpack', 4)
+    fs.writeFileSync(path.join(dir, 'weights.json'), '{ this is not json', 'utf8')
+    await put({ voicePack: 'brokenpack' })
+    const listed = jsonOf(await callRoute(route('/dsh-gal/api/packs'), '/dsh-gal/api/packs'))
+    const summary = listed.voicePacks.find((p) => p.id === 'brokenpack')
+    assert.equal(summary.weightedVoiceCount, 0)
+    const clips = new Set()
+    for (let i = 0; i < 8; i++) {
+      const data = jsonOf(await callRoute(route('/dsh-gal/api/next'), '/dsh-gal/api/next', { query: { voicePack: 'brokenpack' } }))
+      clips.add(data.voice.clip)
+    }
+    assert.equal(clips.size, 4, 'every line must still be reachable')
+    await cleanPacks()
+  })
+
+  await check('the settings panel offers the choice', () => {
+    const css = fs.readFileSync(path.join(ROOT, 'lib/client.js'), 'utf8')
+    assert.match(css, /data-act="voice-order">洗牌池</, 'the panel needs the switch')
+    assert.match(css, /ui\.voiceOrder\.textContent = c\.voiceOrder === 'random' \? '纯随机' : '洗牌池'/)
+    assert.match(css, /save\(\{ voiceOrder: next \}, true\)/, 'the choice must be persisted')
+    assert.match(css, /voiceOrder: 'shuffle'/, 'shuffle must be the fallback the browser assumes')
+    const host = fs.readFileSync(path.join(ROOT, 'lib/index.js'), 'utf8')
+    assert.match(host, /voiceOrder: 'shuffle',/, 'shuffle must be the default in the config')
+    assert.match(host, /pickVoice\(voicePack, params\.get\('currentClip'\) \|\| '', \{ order: config\.voiceOrder \}\)/)
+    assert.match(host, /out\.voiceOrder = raw\.voiceOrder === 'random' \? 'random' : 'shuffle'/, 'only the two known values may be stored')
+  })
+
+  await check('sprites are deliberately left on the old rule', () => {
+    // The bag was asked for on voice only. Art has its own, separate picker and
+    // must keep behaving exactly as before.
+    const source = fs.readFileSync(path.join(ROOT, 'lib/packs.js'), 'utf8')
+    const sprite = source.slice(source.indexOf('function pickSprite'), source.indexOf('function pickVoice'))
+    assert.ok(!/planVoiceRound|bags\./.test(sprite), 'the bag must not have leaked into the sprite picker')
+    assert.match(sprite, /Math\.random\(\) \* list\.length/)
+  })
+}
+
 section('9. Balance + spend')
 await check('/api/state degrades cleanly without a key', async () => {
   const res = await callRoute(route('/dsh-gal/api/state'), '/dsh-gal/api/state')
