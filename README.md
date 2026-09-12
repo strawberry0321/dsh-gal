@@ -38,6 +38,11 @@ dsh plugin --profile desktop add C:\path\to\dsh-gal.tgz
 
 **必须重启 DSH Desktop**：宿主路由和注入脚本在进程启动时装配，只刷新页面不够。
 
+> **用网页端（`npx @deepseek-ai/dsh web`）的话**，把命令里的 `--profile desktop` 换成
+> `--profile web` —— 网页端读的是 `web` profile，装到 `desktop` 里网页端**看不到挂件**
+> （宿主路由不会注册，页面里也不会注入脚本）。两个 profile 各自维护自己的插件，
+> **两端都想用就两端各装一次**；素材包、设置、余额记账是共用的（都在 `%USERPROFILE%\.dsh` 下）。
+
 ```powershell
 # 验证：配置树里应该出现这一行
 dsh --profile desktop --dump-config | Select-String dsh-gal
