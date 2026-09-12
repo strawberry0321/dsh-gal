@@ -798,7 +798,8 @@ section('8c. Voice draw order (shuffle bag) and weights')
 section('8d. Voices are loaded with fetch, not by the media element')
 {
   const css = fs.readFileSync(path.join(ROOT, 'lib/client.js'), 'utf8')
-  const bytes = css.slice(css.indexOf('function audioBytesFor'), css.indexOf('function warmClickSound'))
+  const bytes = css.slice(css.indexOf('function assetBytesFor'), css.indexOf('function showArt'))
+  const audio = css.slice(css.indexOf('function audioBytesFor'), css.indexOf('function showArt'))
   const play = css.slice(css.indexOf('function startVoiceAudio'), css.indexOf('function playClick'))
 
   await check('the bytes come from fetch, played as a blob', () => {
@@ -809,6 +810,7 @@ section('8d. Voices are loaded with fetch, not by the media element')
     assert.match(bytes, /fetch\(url, \{ cache: 'force-cache' \}\)/, 'the bytes must be fetched')
     assert.match(bytes, /URL\.createObjectURL\(blob\)/, 'and played from a blob')
     assert.match(bytes, /URL\.revokeObjectURL/, 'object URLs must be released again')
+    assert.match(audio, /assetBytesFor\(url, '语音'\)/, 'voices read from the shared byte cache')
     assert.ok(!/new Audio\(url\)/.test(play), 'the raw url must not be handed to a media element first')
     assert.match(play, /new Audio\(src\)/, 'the element plays the blob (or the url as a fallback)')
   })
@@ -828,7 +830,8 @@ section('8d. Voices are loaded with fetch, not by the media element')
     // this take a probe to diagnose.
     assert.match(play, /console\.warn\(`\[dsh-gal\] 语音播放被拒绝/)
     assert.match(play, /语音解码或加载失败/)
-    assert.match(bytes, /语音字节读取失败/)
+    assert.match(bytes, /字节读取失败/, 'a failed byte read must say which asset failed')
+    assert.match(bytes, /console\.warn\(/, 'and it must warn rather than throw')
     assert.ok(!/catch \{\s*\/\/ Autoplay restrictions/.test(css), 'the old silent catch is gone')
   })
 
@@ -843,6 +846,58 @@ section('8d. Voices are loaded with fetch, not by the media element')
     // Every poll takes a connection the audio may need.
     const poll = css.slice(css.indexOf('async function pollTurn'), css.indexOf('async function refreshState'))
     assert.match(poll, /if \(document\.hidden\) return/)
+  })
+}
+
+section('8e. Sprites and plates are drawn through the byte cache too')
+{
+  const css = fs.readFileSync(path.join(ROOT, 'lib/client.js'), 'utf8')
+  const sprite = css.slice(css.indexOf('function setSprite'), css.indexOf('function revertToDefaultSprite'))
+  const art = css.slice(css.indexOf('function showArt'), css.indexOf('// ── dom ──'))
+
+  await check('a sprite swap never waits on an image load', () => {
+    // Reported: on a fresh conversation the voice played but the art never moved,
+    // and a pack switch only showed up after the next message. Both waited on an
+    // <img> load — the lowest-priority request on a busy page, and the same class
+    // of request that starved the audio.
+    assert.match(sprite, /showArt\('sprite', spriteImg, url, '立绘'\)/, 'the art goes through the byte cache')
+    assert.ok(!/new Image\(/.test(sprite), 'no <img> preload may gate the swap')
+    assert.ok(!/onload/.test(sprite), 'and no load callback may gate it')
+    assert.match(
+      sprite,
+      /state\.sprite = \{ file, url, crop, aspect \}[\s\S]{0,60}applyLayout\(\)/,
+      'the box must re-flow at once, not when a picture arrives',
+    )
+    assert.match(css, /const shownBlobs = \{ sprite: null, plate: null, gear: null \}/, 'displayed blobs must be tracked')
+  })
+
+  await check('a drawn image falls back to the plain url', () => {
+    // If the fetch itself fails the widget must still show the artwork the old
+    // way rather than an empty box.
+    assert.match(art, /img\.src = url/, 'the url is set first')
+    assert.match(
+      art,
+      /const token = \(artToken\[slot\] \+= 1\)[\s\S]{0,40}img\.src = url/,
+      'each swap must own its slot',
+    )
+    assert.match(
+      art,
+      /if \(!blobUrl \|\| token !== artToken\[slot\]\) return/,
+      'a late blob must not overwrite a newer picture',
+    )
+    assert.match(art, /img\.src = blobUrl/, 'and the blob replaces it when it arrives')
+  })
+
+  await check('an eviction never revokes a picture that is on screen', () => {
+    const trim = css.slice(css.indexOf('if (assetBytes.size > ASSET_BYTES_KEEP)'), css.indexOf('return pending'))
+    assert.match(trim, /blobUrl === shownBlobs\.sprite \|\| blobUrl === shownBlobs\.plate/)
+    assert.match(trim, /blobUrl === shownBlobs\.gear/)
+    assert.match(trim, /blobUrl === voiceBlobUrl \|\| blobUrl === clickBlobUrl/)
+  })
+
+  await check('the plate and the gear icon use the byte cache as well', () => {
+    assert.match(css, /showArt\('gear', gearImg, `\$\{UI\}\/settings\.png`, '设定图标'\)/)
+    assert.match(css, /showArt\('plate', dialogImg, `\$\{UI\}\/dialog\.png`, '对话框底图'\)/)
   })
 }
 
@@ -1268,7 +1323,7 @@ section('12b. Replacing the dialogue plate')
     assert.match(apply, /fetch\(`\$\{API\}\/dialog-image`/, 'the upload must go to the plate route')
     assert.match(apply, /method: 'PUT'/)
     assert.match(apply, /if \(data\.dialog\) state\.dialog = data\.dialog/, 'the new geometry must be adopted')
-    assert.match(apply, /dialogImg\.src = `\$\{UI\}\/dialog\.png\?t=\$\{Date\.now\(\)\}`/, 'the image must be re-requested')
+    assert.match(apply, /showArt\('plate', dialogImg, `\$\{UI\}\/dialog\.png\?t=\$\{Date\.now\(\)\}`/, 'the image must be re-requested through the byte cache')
     assert.match(apply, /applyLayout\(\)/, 'the box must re-flow at once')
     assert.match(css, /PLATE_LABEL = \{ bundled: .*blank: .*user:/, 'the panel must name the plate in force')
   })

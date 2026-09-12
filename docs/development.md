@@ -51,22 +51,28 @@
 
 素材路由只返回扫描到的文件名，路径穿越（`../`）在结构上就不可能。
 
-## 两类自检
+## 三类自检
 
 ```powershell
-node scripts/verify.mjs        # 161 项端到端自检
-node scripts/layout-probe.mjs  # 真实浏览器排版探针（无浏览器时自动跳过）
-npm test                       # 两个一起跑
+node scripts/verify.mjs              # 165 项端到端自检
+node scripts/layout-probe.mjs        # 真实浏览器排版探针（无浏览器时自动跳过）
+node scripts/sprite-starve-probe.mjs # 真实浏览器「图片请求被饿死」探针
+npm test                             # 前两个一起跑
 ```
 
 * **`verify.mjs`**：用一个假的 Cordis 上下文启动真实宿主插件，把每个 HTTP 路由真实调用一遍，
   并用临时 `DSH_HOME` 保证不碰实际配置。覆盖 PNG 裁切、CSV 解析、定价、全部路由、用量记账、
   档位与配置迁移、隐形 UI 不吃点击、控件单位一致性、没有内容表的语音包、换底图全流程、
-  中英日三种包目录名、素材 URL 版本号、语音洗牌池与 weights.json、BOM 检查等。
+  中英日三种包目录名、素材 URL 版本号、语音洗牌池与 weights.json、字节缓存（fetch → blob）、BOM 检查等。
 * **`layout-probe.mjs`**：把真实的 `client.js` 装进无头 Edge/Chrome，驱动真实档位按钮逐档量
   实际 DOM，**自带底图与空白底图各量一遍**（是否放得下、是否居中、文字颜色、字号上限，
   以及空白底图的图形区是否真的用满了整块）；每遍最后再走一次设定面板的换底图流程
   （真文件输入 → `applyPlate()` → 重排），确认换完不用刷新。
+* **`sprite-starve-probe.mjs`**：把 `client.js` 装进无头浏览器后，让**所有非 `blob:` 的图片源
+  一律不落地**（模拟真实页面上图片请求被饿死：实测 `stalled` 十秒以上，一发消息才一起放行），
+  再用真实指针事件点击立绘、真实下拉框换包，从 canvas 读回画面颜色，确认启动、点击换图、
+  设定换包三条路径都还能换图。附带 `DSG_PROBE_CLIENT=<file>` 可以换成任意版本源码跑，
+  用来确认这个探针真的能抓到这个 bug。
 
 ## 目录结构
 
@@ -91,8 +97,9 @@ dsh-gal/
 │       ├── README.md         # 包格式说明
 │       └── neri/             # 内置示例包：pack.json / script.csv / 18 张立绘 / 405 条语音
 └── scripts/
-    ├── verify.mjs            # 161 项端到端自检
+    ├── verify.mjs            # 165 项端到端自检
     ├── layout-probe.mjs      # 真实浏览器排版探针
+    ├── sprite-starve-probe.mjs # 图片请求被饿死时立绘仍要能换
     ├── make-blank-plate.mjs  # 生成自带的空白底图（png + json）
     └── mirror-sprites.mjs    # 无损左右镜像一整套立绘（写完逐像素回验）
 ```

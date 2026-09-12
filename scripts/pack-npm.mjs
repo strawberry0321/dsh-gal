@@ -73,10 +73,14 @@ fs.writeFileSync(path.join(pkgDir, 'package.json'), `${JSON.stringify(pkg, null,
 const count = (rel) => fs.readdirSync(path.join(pkgDir, rel)).length
 const sprites = count(path.join(PACK, 'sprites'))
 const voices = count(path.join(PACK, 'voices'))
-const ui = count(path.join('assets', 'ui'))
 if (sprites !== 18) throw new Error(`expected 18 sprites, got ${sprites}`)
 if (voices !== SAMPLE_VOICES) throw new Error(`expected ${SAMPLE_VOICES} voices, got ${voices}`)
-if (ui !== 4) throw new Error(`expected 4 ui assets, got ${ui}`)
+// Named, not counted: the blank plate preset is only reachable when its artwork
+// ships, and a count would not have noticed it going missing.
+const UI_REQUIRED = ['dialog.png', 'dialog.json', 'dialog-blank.png', 'dialog-blank.json', 'settings.png', 'click.wav']
+const ui = fs.readdirSync(path.join(pkgDir, 'assets', 'ui'))
+const uiMissing = UI_REQUIRED.filter((name) => !ui.includes(name))
+if (uiMissing.length) throw new Error(`missing ui assets: ${uiMissing.join(', ')}`)
 
 fs.mkdirSync(OUT_DIR, { recursive: true })
 const out = execFileSync('npm', ['pack', '--pack-destination', OUT_DIR, '--loglevel=error'], {
@@ -92,6 +96,6 @@ const tarball = path.join(OUT_DIR, out)
 const stat = fs.statSync(tarball)
 fs.rmSync(stage, { recursive: true, force: true })
 
-console.log(`  sprites ${sprites} · voices ${voices}/${allVoices.length}（示例）· ui ${ui}`)
+console.log(`  sprites ${sprites} · voices ${voices}/${allVoices.length}（示例）· ui ${ui.join(',')}`)
 console.log(`  ${out}  ${(stat.size / 1024 / 1024).toFixed(1)} MiB`)
-console.log(`\n发布：npm publish ${path.relative(process.cwd(), tarball)}`)
+console.log(`\n这是 npm 用的精简包；GitHub Release 用的是仓库根目录的 \`npm pack\` 全量包。`)
