@@ -119,10 +119,16 @@ dsh plugin --profile desktop remove dsh-gal
 | 角色 | 默认立绘 | 获取方式 |
 |---|---|---|
 | **neri** | <img src="assets/packs/neri/sprites/large_neri_01face.png" width="200" alt="neri 默认立绘"> | 随插件自带 |
-| **Mashiro** | <img src="assets/characters/mashiro.png" width="200" alt="Mashiro 默认立绘"> | [Releases](https://github.com/strawberry0321/dsh-gal/releases/latest) 的 `mashiro-pack.zip` |
+| **Mashiro 精简版** | <img src="assets/characters/mashiro.png" width="200" alt="Mashiro 默认立绘"> | [Releases](https://github.com/strawberry0321/dsh-gal/releases/latest) 的 `mashiro-pack.zip` |
 | **noir音效** | <img src="assets/characters/noir.png" width="200" alt="noir 默认立绘"> | [Releases](https://github.com/strawberry0321/dsh-gal/releases/latest) 的 `noir-pack.zip` |
 | **Karuha** | <img src="assets/characters/karuha.png" width="200" alt="Karuha 默认立绘"> | [Releases](https://github.com/strawberry0321/dsh-gal/releases/latest) 的 `karuha-pack.zip` |
 
 下载解压到 `%USERPROFILE%\.dsh\dsh-gal\packs\`，刷新页面即可在设定面板的「立绘包 / 语音包」里选用。
+
+**Mashiro 有两份**：
+
+* `mashiro-pack.zip` —— **精简版**（推荐）：37 张立绘 + 135 条语音，台词逐条筛过。
+* `mashiro-pack-full.zip` —— 完整版：**原台词过于伤感，不建议使用**，296 条语音原样留存。
+  包 id 是 `Mashiro-full`，和精简版可以同时装，在设定面板里分开选。
 
 
