@@ -43,7 +43,8 @@
 | GET | `/dsh-gal/api/next` | 随机抽一条语音 + 一张立绘（返回台词） |
 | GET | `/dsh-gal/api/packs` | 立绘包 / 语音包列表 |
 | GET/PUT | `/dsh-gal/api/config` | 读取 / 局部更新配置 |
-| GET | `/dsh-gal/asset/ui/dialog.json` | 对话框底图的裁切与排版几何 |
+| GET/PUT/DELETE | `/dsh-gal/api/dialog-image` | 换底图：GET 报当前几何，PUT 传图片或 `?preset=blank`，DELETE 恢复默认 |
+| GET | `/dsh-gal/asset/ui/dialog.json` | 对话框底图的裁切与排版几何（每次请求重读，改完即时生效） |
 | GET | `/dsh-gal/asset/ui/{dialog.png,settings.png,click.wav}` | 固定 UI 素材 |
 | GET | `/dsh-gal/asset/sprite?pack=&file=` | 立绘图片 |
 | GET | `/dsh-gal/asset/voice?pack=&file=` | 语音文件 |
@@ -53,16 +54,18 @@
 ## 两类自检
 
 ```powershell
-node scripts/verify.mjs        # 128 项端到端自检
+node scripts/verify.mjs        # 139 项端到端自检
 node scripts/layout-probe.mjs  # 真实浏览器排版探针（无浏览器时自动跳过）
 npm test                       # 两个一起跑
 ```
 
 * **`verify.mjs`**：用一个假的 Cordis 上下文启动真实宿主插件，把每个 HTTP 路由真实调用一遍，
   并用临时 `DSH_HOME` 保证不碰实际配置。覆盖 PNG 裁切、CSV 解析、定价、全部路由、用量记账、
-  档位与配置迁移、隐形 UI 不吃点击、控件单位一致性、没有内容表的语音包、BOM 检查等。
+  档位与配置迁移、隐形 UI 不吃点击、控件单位一致性、没有内容表的语音包、换底图全流程、BOM 检查等。
 * **`layout-probe.mjs`**：把真实的 `client.js` 装进无头 Edge/Chrome，驱动真实档位按钮逐档量
-  实际 DOM，分四种内容页各量一遍（是否放得下、是否居中、文字颜色、字号上限）。
+  实际 DOM，**自带底图与空白底图各量一遍**（是否放得下、是否居中、文字颜色、字号上限，
+  以及空白底图的图形区是否真的用满了整块）；每遍最后再走一次设定面板的换底图流程
+  （真文件输入 → `applyPlate()` → 重排），确认换完不用刷新。
 
 ## 目录结构
 
@@ -81,14 +84,15 @@ dsh-gal/
 │   ├── usage.js              # 余额接口 + 差额记账
 │   └── png-alpha.js          # 零依赖 PNG 透明通道扫描（自动裁切立绘）
 ├── assets/
-│   ├── ui/                   # dialog.png / dialog.json / settings.png / click.wav
+│   ├── ui/                   # dialog.png / dialog.json / dialog-blank.* / settings.png / click.wav
 │   ├── pricing.json          # 可编辑的定价表
 │   └── packs/
 │       ├── README.md         # 包格式说明
 │       └── neri/             # 内置示例包：pack.json / script.csv / 18 张立绘 / 405 条语音
 └── scripts/
-    ├── verify.mjs            # 128 项端到端自检
-    └── layout-probe.mjs      # 真实浏览器排版探针
+    ├── verify.mjs            # 139 项端到端自检
+    ├── layout-probe.mjs      # 真实浏览器排版探针
+    └── make-blank-plate.mjs  # 生成自带的空白底图（png + json）
 ```
 
 ## 打包与发布
@@ -108,7 +112,7 @@ dsh plugin --profile desktop add link:C:\path\to\dsh-gal
 
 * `package.json` 的 `files` 已包含 `lib`、`scripts`、`assets/**`、`cordis.patch.yml`、`docs`、
   `README.md`、`LICENSE`，`npm pack` 出来的就是可直接安装的完整包。
-* 版本号改了记得同步 Release 的 tag 与文件名（`v1.19.0` / `dsh-gal-1.19.0.tgz`）。
-* 每次发版**同时传一个不带版本号的 `dsh-gal.tgz`**：插件精选列表的条目用
-  `releases/latest/download/dsh-gal.tgz` 指向预构建包。
+* 版本号改了记得同步 Release 的 tag 与文件名（`v2.0.0` / `dsh-gal-2.0.0.tgz`）。
+* 每次发版**同时传一个不带版本号的 `dsh-gal.tgz`**：README 的安装步骤和插件精选列表的条目都用
+  `releases/latest/download/dsh-gal.tgz` 指向预构建包，所以它必须和新版一起传。
 * 仓库自带 `.github/workflows/verify.yml`，推上去会自动跑两类自检。

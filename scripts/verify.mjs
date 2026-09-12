@@ -834,6 +834,7 @@ section('12. Dialogue plate crop')
       assert.deepEqual(hostDefault[key], shipped[key], `host DEFAULT_DIALOG_GEOMETRY.${key} drifted`)
     }
     assert.equal(hostDefault.radius, shipped.radius)
+    assert.equal(hostDefault.logoShare, shipped.logoShare, 'host DEFAULT_DIALOG_GEOMETRY.logoShare drifted')
     // The browser half cannot import anything, so its fallback is a literal that
     // has to be kept in step by hand — hence this check.
     const clientSource = fs.readFileSync(path.join(ROOT, 'lib/client.js'), 'utf8')
@@ -844,10 +845,171 @@ section('12. Dialogue plate crop')
     for (const key of ['image', 'crop', 'inset', 'footer']) {
       assert.deepEqual(clientDefault[key], shipped[key], `client DEFAULT_DIALOG_GEO.${key} drifted`)
     }
+    assert.equal(clientDefault.logoShare, shipped.logoShare, 'client DEFAULT_DIALOG_GEO.logoShare drifted')
   })
   await check('bootstrap hands the geometry to the browser', async () => {
     const data = jsonOf(await callRoute(route('/dsh-gal/api/bootstrap'), '/dsh-gal/api/bootstrap'))
     assert.deepEqual(data.dialog.crop, geo.crop)
+    assert.equal(data.dialogSource, 'bundled', 'a fresh install uses the shipped plate')
+  })
+}
+
+section('12b. Replacing the dialogue plate')
+{
+  const { imageSize, parseDialogGeometry, DEFAULT_DIALOG_GEOMETRY } = mod
+  const plateRoute = '/dsh-gal/asset/ui/dialog.png'
+  const imageRoute = '/dsh-gal/api/dialog-image'
+  const userJson = path.join(TMP_HOME, 'dsh-gal', 'ui', 'dialog.json')
+  const readPlate = async () => callRoute(route(plateRoute), plateRoute)
+  const plateState = async () => jsonOf(await callRoute(route(imageRoute), imageRoute))
+
+  await check('reads a PNG, a GIF, a WebP and a JPEG header', () => {
+    const png = fs.readFileSync(path.join(ROOT, 'assets/ui/dialog-blank.png'))
+    assert.equal(imageSize(png).mime, 'image/png')
+    assert.equal(imageSize(png).width, 1200)
+    assert.equal(imageSize(png).height, 700)
+
+    // A real GIF is a few hundred bytes; the reader insists on a header-sized
+    // buffer so a truncated upload cannot be mistaken for a picture.
+    const gif = Buffer.concat([
+      Buffer.from('GIF89a', 'latin1'),
+      Buffer.from([0x40, 0x01, 0xf0, 0x00]),
+      Buffer.alloc(32),
+    ])
+    assert.deepEqual(imageSize(gif), { mime: 'image/gif', width: 320, height: 240 })
+
+    const webp = Buffer.alloc(32)
+    webp.write('RIFF', 0, 'latin1')
+    webp.write('WEBP', 8, 'latin1')
+    webp.write('VP8X', 12, 'latin1')
+    webp.writeUIntLE(639, 24, 3) // stored as size-1
+    webp.writeUIntLE(359, 27, 3)
+    assert.deepEqual(imageSize(webp), { mime: 'image/webp', width: 640, height: 360 })
+
+    // SOI, a JFIF APP0 segment, then SOF0 with the real size.
+    const jpeg = Buffer.concat([
+      Buffer.from([0xff, 0xd8]),
+      Buffer.from([0xff, 0xe0, 0x00, 0x10]),
+      Buffer.from('JFIF\0', 'latin1'),
+      Buffer.from([0x01, 0x01, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00]),
+      Buffer.from([0xff, 0xc0, 0x00, 0x11, 0x08, 0x02, 0x58, 0x03, 0x20, 0x03]),
+      Buffer.alloc(8),
+    ])
+    assert.deepEqual(imageSize(jpeg), { mime: 'image/jpeg', width: 800, height: 600 })
+    assert.equal(imageSize(Buffer.from('this is not a picture at all, really')), null)
+    assert.equal(imageSize(Buffer.alloc(4)), null)
+  })
+
+  await check('parseDialogGeometry clamps what it cannot trust', () => {
+    assert.deepEqual(parseDialogGeometry(null), DEFAULT_DIALOG_GEOMETRY)
+    assert.deepEqual(parseDialogGeometry('{ not json'), DEFAULT_DIALOG_GEOMETRY)
+    const wild = parseDialogGeometry(JSON.stringify({ logoShare: 9, radius: -4, crop: { x: 0.5, y: 0, w: 0.9, h: 1 } }))
+    assert.equal(wild.logoShare, 1, 'a share above 1 would push the figures out of the plate')
+    assert.equal(wild.radius, 0)
+    assert.equal(wild.crop.w, 0.5, 'a crop running past the right edge is trimmed')
+    assert.equal(parseDialogGeometry(JSON.stringify({ logoShare: 0 })).logoShare, 0.2)
+    assert.equal(parseDialogGeometry('{}').logoShare, DEFAULT_DIALOG_GEOMETRY.logoShare)
+  })
+
+  await check('the blank plate ships with geometry that matches its pixels', () => {
+    const bytes = fs.readFileSync(path.join(ROOT, 'assets/ui/dialog-blank.png'))
+    const described = JSON.parse(fs.readFileSync(path.join(ROOT, 'assets/ui/dialog-blank.json'), 'utf8'))
+    const size = imageSize(bytes)
+    assert.ok(size, 'the blank plate is not a readable image')
+    assert.equal(size.width, described.image.width, 'the declared width disagrees with the file')
+    assert.equal(size.height, described.image.height, 'the declared height disagrees with the file')
+    assert.deepEqual(described.crop, { x: 0, y: 0, w: 1, h: 1 }, 'the whole blank plate is usable, so nothing is cropped')
+    assert.equal(described.logoShare, 1)
+    assert.ok(described.footer.heightRatio > 0.2 && described.footer.heightRatio < 0.7)
+    assert.ok(described.inset.top > 0 && described.inset.bottom > 0, 'text needs breathing room from the edge')
+  })
+
+  await check('a replaced dialog.json takes effect without re-applying the plugin', async () => {
+    // Regression guard for the load-once geometry: it was resolved inside apply(),
+    // so the settings panel's 「更换图片」 button would have kept the old shape
+    // until DSH was restarted.
+    fs.mkdirSync(path.dirname(userJson), { recursive: true })
+    fs.writeFileSync(userJson, JSON.stringify({ image: { width: 640, height: 360 }, crop: { x: 0, y: 0, w: 1, h: 1 } }), 'utf8')
+    const asked = jsonOf(await callRoute(route('/dsh-gal/asset/ui/dialog.json'), '/dsh-gal/asset/ui/dialog.json'))
+    assert.equal(asked.image.width, 640)
+    assert.equal(asked.image.height, 360)
+    const boot = jsonOf(await callRoute(route('/dsh-gal/api/bootstrap'), '/dsh-gal/api/bootstrap'))
+    assert.equal(boot.dialog.image.width, 640, 'bootstrap still reports the load-time geometry')
+    assert.equal(boot.dialog.logoShare, DEFAULT_DIALOG_GEOMETRY.logoShare, 'an omitted field falls back to the default')
+    fs.rmSync(userJson, { force: true })
+    const after = jsonOf(await callRoute(route('/dsh-gal/asset/ui/dialog.json'), '/dsh-gal/asset/ui/dialog.json'))
+    assert.equal(after.image.width, 1280, 'removing the file must fall back to the shipped plate')
+  })
+
+  await check('installs an uploaded image as the plate', async () => {
+    const bytes = fs.readFileSync(path.join(ROOT, 'assets/ui/dialog-blank.png'))
+    const res = await callRoute(route(imageRoute), imageRoute, { method: 'PUT', body: bytes })
+    assert.equal(res.status, 200, res.body.toString('utf8'))
+    const answer = jsonOf(res)
+    assert.equal(answer.ok, true)
+    assert.equal(answer.dialog.image.width, 1200, 'the answer must describe the new plate')
+    assert.deepEqual(answer.dialog.crop, { x: 0, y: 0, w: 1, h: 1 }, 'a replacement is taken whole')
+    assert.equal(answer.dialog.logoShare, DEFAULT_DIALOG_GEOMETRY.logoShare, 'the layout the user had is carried over')
+
+    const served = await readPlate()
+    assert.equal(served.status, 200)
+    assert.equal(served.headers['Content-Type'], 'image/png')
+    assert.equal(served.headers['Cache-Control'], 'no-store', 'a cached plate would survive its own replacement')
+    assert.equal(served.body.length, bytes.length)
+    assert.ok(served.body.equals(bytes), 'the uploaded bytes were not served back')
+
+    const onDisk = JSON.parse(fs.readFileSync(userJson, 'utf8'))
+    assert.equal(onDisk.image.width, 1200, 'the geometry must be written next to the image')
+    assert.equal((await plateState()).plateSource, 'blank', 'the bundled blank plate is recognised')
+  })
+
+  await check('refuses a body that is not an image, leaving the plate alone', async () => {
+    const res = await callRoute(route(imageRoute), imageRoute, { method: 'PUT', body: Buffer.from('definitely not a png') })
+    assert.equal(res.status, 400)
+    assert.match(jsonOf(res).error, /PNG/)
+    const served = await readPlate()
+    assert.equal(served.body.length, fs.statSync(path.join(ROOT, 'assets/ui/dialog-blank.png')).size, 'the plate was damaged')
+  })
+
+  await check('restores the bundled artwork', async () => {
+    const res = await callRoute(route(imageRoute), imageRoute, { method: 'DELETE' })
+    assert.equal(res.status, 200)
+    const answer = jsonOf(res)
+    assert.equal(answer.source, 'bundled')
+    assert.equal(answer.dialog.image.width, 1280, 'the shipped geometry must come back')
+    assert.equal(fs.existsSync(userJson), false, 'ui/dialog.json must be removed too')
+    const served = await readPlate()
+    assert.ok(served.body.length > 10000, 'the shipped plate was not served')
+    assert.equal((await plateState()).plateSource, 'bundled')
+  })
+
+  await check('installs the bundled blank plate on request', async () => {
+    const res = await callRoute(route(imageRoute), imageRoute, { method: 'PUT', query: { preset: 'blank' } })
+    assert.equal(res.status, 200, res.body.toString('utf8'))
+    assert.equal(jsonOf(res).plateSource, 'blank')
+    assert.equal(jsonOf(res).dialog.image.width, 1200)
+    const served = await readPlate()
+    const blank = fs.readFileSync(path.join(ROOT, 'assets/ui/dialog-blank.png'))
+    assert.ok(served.body.equals(blank), 'the bundled blank plate was not installed verbatim')
+  })
+
+  await check('the settings panel offers all three plate controls', () => {
+    const css = fs.readFileSync(path.join(ROOT, 'lib/client.js'), 'utf8')
+    const markup = css.slice(css.indexOf('data-act="plate-pick"'), css.indexOf('data-act="sprite-pack"'))
+    assert.match(markup, /data-act="plate-pick"[^>]*>更换图片…/)
+    assert.match(markup, /data-act="plate-blank">空白底图/)
+    assert.match(markup, /data-act="plate-default">恢复默认/)
+    assert.match(markup, /<input class="dsg-file" type="file" data-act="plate-file"/, 'a file input is needed to pick an image')
+    assert.match(markup, /accept="image\/png,image\/jpeg,image\/webp,image\/gif"/)
+    assert.match(css, /ui\.platePick\.addEventListener\('click', \(\) => ui\.plateFile\.click\(\)\)/, 'the button must open the picker')
+    assert.match(css, /ui\.plateFile\.value = ''/, 'picking the same file twice must still fire change')
+    const apply = css.slice(css.indexOf('async function applyPlate'), css.indexOf('function renderForm'))
+    assert.match(apply, /fetch\(`\$\{API\}\/dialog-image`/, 'the upload must go to the plate route')
+    assert.match(apply, /method: 'PUT'/)
+    assert.match(apply, /if \(data\.dialog\) state\.dialog = data\.dialog/, 'the new geometry must be adopted')
+    assert.match(apply, /dialogImg\.src = `\$\{UI\}\/dialog\.png\?t=\$\{Date\.now\(\)\}`/, 'the image must be re-requested')
+    assert.match(apply, /applyLayout\(\)/, 'the box must re-flow at once')
+    assert.match(css, /PLATE_LABEL = \{ bundled: .*blank: .*user:/, 'the panel must name the plate in force')
   })
 }
 
@@ -1152,11 +1314,21 @@ section('15. Settings controls: units, centring, defaults')
   })
   await check('the figure sheets stay clear of the logo', () => {
     // The logo's top edge is 72.8% down the artwork; the inner box starts at 7%
-    // and spans 89%, so (72.8-7)/89 = 0.739 is the last safe share.
-    const share = Number(/const LOGO_SAFE_SHARE = ([\d.]+)/.exec(css)?.[1])
-    assert.ok(Number.isFinite(share), 'LOGO_SAFE_SHARE not found')
-    assert.ok(share <= 0.739, `share ${share} would put the figures on the logo`)
-    assert.match(css, /Math\.round\(cap \* LOGO_SAFE_SHARE\)/, 'the band must be derived from the safe share')
+    // and spans 89%, so (72.8-7)/89 = 0.739 is the last safe share. That share
+    // now travels with the plate: the shipped artwork declares 0.72, a self-made
+    // plate with nothing in the corner declares 1.
+    const shippedPlate = JSON.parse(fs.readFileSync(path.join(ROOT, 'assets/ui/dialog.json'), 'utf8'))
+    assert.ok(Number.isFinite(shippedPlate.logoShare), 'assets/ui/dialog.json must declare logoShare')
+    assert.ok(shippedPlate.logoShare <= 0.739, `share ${shippedPlate.logoShare} would put the figures on the logo`)
+    const blankPlate = JSON.parse(fs.readFileSync(path.join(ROOT, 'assets/ui/dialog-blank.json'), 'utf8'))
+    assert.equal(blankPlate.logoShare, 1, 'the blank plate has no logo, so it may use the whole height')
+    assert.match(css, /function logoShare\(\)/, 'the band must come from the plate geometry')
+    assert.match(css, /Math\.round\(cap \* logoShare\(\)\)/, 'the band must be derived from the safe share')
+    assert.match(
+      css,
+      /num\(\(state\.dialog \|\| \{\}\)\.logoShare/,
+      'the share must be read per call, or a replaced plate keeps the old band',
+    )
     // The band must be measured against the true inner height, not a padded one —
     // inflating it pushed the band down over the logo on the smallest plates.
     assert.match(css, /const innerH = Math\.max\(1, m\.dlgH/, 'innerH must not be inflated to a floor')

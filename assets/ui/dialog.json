@@ -6,11 +6,13 @@
     "inset": "文字区域相对裁切后画面四周的内边距（0~1 比例）",
     "footer.heightRatio": "底部（余额/花费）占文字区高度的比例",
     "footer.maxWidthRatio": "底部文字最多横向占用多少，避免压到右下角 logo",
-    "radius": "圆角像素"
+    "radius": "圆角像素",
+    "logoShare": "图形区（余额/花费）最多用掉文字区高度的几分之几；logo 顶边在 72.8% 处，所以取 0.72。底图没有 logo 时填 1"
   },
   "image": { "width": 1280, "height": 720 },
   "crop": { "x": 0, "y": 0.42, "w": 1, "h": 0.58 },
   "inset": { "left": 0.05, "right": 0.05, "top": 0.07, "bottom": 0.04 },
   "footer": { "heightRatio": 0.42, "maxWidthRatio": 0.66 },
-  "radius": 10
+  "radius": 10,
+  "logoShare": 0.72
 }

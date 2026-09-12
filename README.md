@@ -21,17 +21,18 @@
 | 回归默认立绘 | 对话框消失后切回立绘包的默认立绘（可配 `spriteRevertOnHide`） |
 | 自动播放 | 可设定每 X 分钟自动换立绘 + 播语音（默认关闭） |
 | 拖拽 / 缩放 | 立绘与对话框各 1–10 档，用 `−` / `+` 按钮调，默认 5 档 |
+| 对话框底图 | 设定面板里一键换图：`更换图片…` 选自己的图，`空白底图` 换成自带的纯白面板，`恢复默认` 还原；**换完立即生效**，不用重启 |
 | 多包管理 | 立绘包与语音包**分别**选择，可以「A 的立绘 + B 的语音」 |
 
 ## 安装
 
 **前置**：已在 DSH 里配置好 `DEEPSEEK_API_KEY` 凭据。
 
-到 **[Releases](https://github.com/strawberry0321/dsh-gal/releases/latest)** 下载
-`dsh-gal-1.19.0.tgz`，然后按本地文件安装：
+到 **[Releases](https://github.com/strawberry0321/dsh-gal/releases/latest)** 下载 `dsh-gal.tgz`
+（不带版本号的那个，永远指向最新版），然后按本地文件安装：
 
 ```powershell
-dsh plugin --profile desktop add C:\path\to\dsh-gal-1.19.0.tgz
+dsh plugin --profile desktop add C:\path\to\dsh-gal.tgz
 ```
 
 **必须重启 DSH Desktop**：宿主路由和注入脚本在进程启动时装配，只刷新页面不够。
@@ -71,6 +72,11 @@ dsh plugin --profile desktop remove dsh-gal
 | 6 | 立绘包 | neri | 下拉选择，切换后立即随机抽一张 |
 | 7 | 语音包 | neri | 下拉选择，**可以和立绘包不同** |
 
+「对话框」一组里还有 **对话框底图**：`更换图片…` 挑一张自己的图（PNG / JPEG / WebP / GIF），
+`空白底图` 换成随插件自带的纯白面板，`恢复默认` 还原成自带立绘。三者都**立即生效**，
+不必重启 DSH；想微调裁切和留白就改 `ui\dialog.json`（见
+[docs/customize.md](docs/customize.md)）。
+
 ## 自定义立绘包 / 语音包
 
 把文件夹放进用户目录（升级不会被覆盖），设置面板里就会多出这个选项：
@@ -93,7 +99,6 @@ dsh plugin --profile desktop remove dsh-gal
 
 完整格式（`script.csv` 列名、`pack.json` 字段、换对话框底图、定价表）见
 **[docs/customize.md](docs/customize.md)**。
-
 
 ## 文档
 

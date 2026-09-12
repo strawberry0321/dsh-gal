@@ -55,7 +55,7 @@ function shortestLine() {
   return best
 }
 
-function buildPage(clientSource, longest, shortest, geometry) {
+function buildPage(clientSource, longest, shortest, geometry, swap) {
   const bootstrapConfig = {
     version: 3,
     spritePack: 'neri',
@@ -103,6 +103,15 @@ function buildPage(clientSource, longest, shortest, geometry) {
   var LONG = ${JSON.stringify(longest)};
   var SHORT = ${JSON.stringify(shortest)};
   var PIXEL = ${JSON.stringify(pixel)};
+  // How much of the plate's inner height the figures may reach — it is part of
+  // the plate geometry now, so a plate with nothing in the corner is judged by
+  // its own number instead of the shipped artwork's. Carried on window because
+  // the measuring script below runs in its own scope.
+  window.__probeLogoShare = ${JSON.stringify(Number(geometry.logoShare) || 0.72)};
+  // What the plate route answers when the panel swaps the artwork: the geometry
+  // of the plate this run is expected to switch to.
+  window.__probeSwapDialog = ${JSON.stringify(swap.dialog)};
+  window.__probeSwapSource = ${JSON.stringify(swap.source)};
   // What the box is showing right now — the "did the whole line render" check has
   // to follow the phase, not a single hard-coded string.
   window.__probeExpect = LONG.ja;
@@ -139,6 +148,10 @@ function buildPage(clientSource, longest, shortest, geometry) {
       body = window.__probeTurnSeq
         ? { ok: true, seq: 1, turn: 3, tokens: 12483, amount: 0.0384, ts: Date.now() }
         : { ok: true, seq: 0, turn: null, tokens: null, amount: null, ts: null };
+    } else if (route.indexOf('/api/dialog-image') !== -1) {
+      // The panel's plate swap. The real host writes the image and answers with
+      // the geometry describing it; the browser only has to adopt both.
+      body = { ok: true, dialog: window.__probeSwapDialog, plateSource: window.__probeSwapSource };
     } else if (route.indexOf('/api/config') !== -1) {
       if (init && init.body) {
         try {
@@ -218,7 +231,8 @@ ${clientSource}
       common.inkBlack = common.inkColor === 'rgb(36, 36, 36)';
       common.inkText = inkLine ? (inkLine.textContent || '').replace(/\s+/g, ' ').trim() : '';
       // How far down the plate the content reaches. The logo's top edge is at
-      // plate y 72.8%, so anything past that collides with it.
+      // plate y 72.8%, so on the shipped artwork anything past that collides with
+      // it; the tolerance is the same 2% the client keeps.
       var bottomFraction = (footRect.top - dialogRect.top + footRect.height) / dialogRect.height;
       common.sheet = 'figures';
       common.sheetName = costShown ? 'cost' : 'wallet';
@@ -233,7 +247,7 @@ ${clientSource}
       common.overflowsBy = Math.round(Math.max(0, contentH - footRect.height) * 10) / 10;
       common.clippedCue = false;
       common.footClipped = foot.scrollHeight > foot.clientHeight + 1;
-      common.clearsLogo = bottomFraction <= 0.74;
+      common.clearsLogo = bottomFraction <= (window.__probeLogoShare || 0.72) + 0.02;
       // The whole point of this sheet: the voice line must be gone.
       common.lineGone = common.lineHidden;
       return common;
@@ -320,6 +334,28 @@ ${clientSource}
         }
         await tick(600)
         await sweep('line-short · 极短台词', 'line')
+
+        // Phase E: swap the plate from the panel, the way a user does — pick a
+        // file, let the change event fire, and see whether the box adopts the
+        // geometry that comes back without a reload. The level stays at 10, so
+        // the plate's aspect is directly readable from the measured height.
+        var levelTen = out.phases['line-short · 极短台词'][9];
+        var before = measure(10);
+        var dt = new DataTransfer();
+        dt.items.add(new File([new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10])], 'mine.png', { type: 'image/png' }));
+        var input = q('[data-act="plate-file"]');
+        input.files = dt.files;
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+        await tick(400);
+        var after = measure(10);
+        out.plate = {
+          src: q('.dsg-dialog-img').getAttribute('src'),
+          info: q('[data-val="plate-info"]').textContent,
+          beforeH: before.dialogH,
+          afterH: after.dialogH,
+          levelTenH: levelTen.dialogH,
+          width: q('.dsg-dialog').getBoundingClientRect().width,
+        };
       } catch (err) {
         out.error = String((err && err.message) || err);
       }
@@ -339,7 +375,28 @@ if (!browser) {
 
 const clientSource = fs.readFileSync(path.join(ROOT, 'lib/client.js'), 'utf8')
 assert.ok(!clientSource.includes('</script'), 'client.js must not contain a literal </script')
-const geometry = JSON.parse(fs.readFileSync(path.join(ROOT, 'assets/ui/dialog.json'), 'utf8'))
+// Both plates ship with the plugin and both are selectable from the settings
+// panel, so both get measured. The blank one is 1200x700 uncropped — a much
+// taller box than the cropped artwork — and its figures are allowed the whole
+// height, which is the part most likely to be quietly wrong.
+const PLATES = [
+  {
+    title: 'shipped 1280x720 artwork (logo in the corner, logoShare 0.72)',
+    geometry: JSON.parse(fs.readFileSync(path.join(ROOT, 'assets/ui/dialog.json'), 'utf8')),
+  },
+  {
+    title: 'bundled blank plate 1200x700 (no logo, logoShare 1)',
+    geometry: JSON.parse(fs.readFileSync(path.join(ROOT, 'assets/ui/dialog-blank.json'), 'utf8')),
+    expectFullBand: true,
+  },
+]
+// Each run ends by swapping to the *other* plate from the panel: the shipped run
+// presses 「更换图片…」, the blank run presses 「恢复默认」. Both are real button
+// paths, and both change the plate's aspect enough to be measurable.
+const blankGeometry = PLATES[1].geometry
+const shippedGeometry = PLATES[0].geometry
+PLATES[0].swap = { dialog: blankGeometry, source: 'blank', label: '自带的空白底图' }
+PLATES[1].swap = { dialog: shippedGeometry, source: 'bundled', label: '插件内置底图' }
 const longest = worstCaseLine()
 const shortest = shortestLine()
 // Read the cap out of the client so the probe cannot drift from it...
@@ -350,15 +407,20 @@ assert.ok(Number.isFinite(declaredMax), 'MAX_LINE_FONT not found in lib/client.j
 // caption on a 400px plate; the old behaviour was 44.
 const ABSOLUTE_MAX_LINE_FONT = 34
 
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'dsg-probe-'))
-const page = path.join(tmp, 'probe.html')
-fs.writeFileSync(page, buildPage(clientSource, longest, shortest, geometry), 'utf8')
-
 console.log('dsh-gal · real-browser layout probe')
 console.log(`browser : ${browser}`)
 console.log(`worst case: ${longest.clip} (${[...longest.ja].length} chars, ${(longest.ja.match(/\n/g) || []).length} hard breaks)`)
 console.log(`shortest  : ${shortest.clip} ("${shortest.ja}", ${[...shortest.ja].length} chars) — cap ${declaredMax}px, limit ${ABSOLUTE_MAX_LINE_FONT}px`)
+
+let failures = 0
+const plateSummaries = []
+for (const plate of PLATES) {
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'dsg-probe-'))
+const page = path.join(tmp, 'probe.html')
+fs.writeFileSync(page, buildPage(clientSource, longest, shortest, plate.geometry, plate.swap), 'utf8')
+
 console.log('')
+console.log(`══ ${plate.title} ${'═'.repeat(Math.max(0, 62 - plate.title.length))}`)
 
 const run = spawnSync(
   browser,
@@ -414,7 +476,6 @@ console.log(`viewport: ${result.viewport[0]}x${result.viewport[1]}`)
 // truncate — but the line sheet must *say* it is truncated rather than silently
 // look like an overlap.
 const READABLE_FROM = 3
-let failures = 0
 for (const [phase, rows] of Object.entries(result.phases)) {
   const expect = result.expect ? result.expect[phase] : null
   console.log('')
@@ -485,10 +546,56 @@ const summary = Object.entries(result.phases).map(([phase, rows]) => {
   const firstOk = rows.find((r) => r.fits && r.fullyRendered && !r.footClipped)
   return `${phase.split(' ')[0]}: ${firstOk ? `≥${firstOk.level} 档完整显示` : '无档位完整显示'}`
 })
+plateSummaries.push(`${plate.geometry.image.width}x${plate.geometry.image.height} → ${summary.join('   |   ')}`)
+console.log(summary.join('   |   '))
+console.log('比允许下限更小的档位按预期截断，并显示淡出提示')
+
+// A plate with nothing in the corner must actually hand the figures the freed
+// band: if `logoShare` were ignored, the receipt would still stop at 72% and this
+// plate would behave exactly like the shipped one — the whole point of it gone.
+if (plate.expectFullBand) {
+  const deepest = Math.max(
+    ...Object.entries(result.phases)
+      .filter(([phase]) => /cost|wallet/.test(phase))
+      .flatMap(([, rows]) => rows.map((r) => r.contentBottomFraction || 0)),
+  )
+  if (deepest > 0.8) {
+    console.log(`空白底图：图形区用到画面 ${deepest} 处（有 logo 的底图止步 0.74）`)
+  } else {
+    console.log(`空白底图：图形区只到 ${deepest}，logoShare 没有生效`)
+    failures++
+  }
+}
+
+// The plate swap, driven through the real file input and the real button.
+const swapped = result.plate
+if (!swapped) {
+  console.log('换底图：面板没有走完换图流程')
+  failures++
+} else {
+  // The box is `width / aspect` tall, so switching plate scales its height by the
+  // ratio of the two aspects — measured, not assumed.
+  const aspectOf = (geo) => (geo.crop.w * geo.image.width) / (geo.crop.h * geo.image.height)
+  const expectedRatio = aspectOf(plate.geometry) / aspectOf(plate.swap.dialog)
+  const ratio = swapped.afterH / swapped.beforeH
+  const problems = []
+  if (!/\?t=\d+/.test(swapped.src || '')) problems.push(`图片没换新 URL（${swapped.src}）`)
+  if (!(swapped.info || '').includes(plate.swap.label)) problems.push(`面板没报新底图（${swapped.info}）`)
+  if (!(swapped.info || '').includes(String(plate.swap.dialog.image.width))) problems.push(`面板尺寸没更新（${swapped.info}）`)
+  if (Math.abs(ratio - expectedRatio) > 0.05) problems.push(`盒子高宽比没跟着几何变（${ratio.toFixed(3)}，应约 ${expectedRatio.toFixed(3)}）`)
+  if (problems.length) {
+    console.log(`换底图：${problems.join('，')}`)
+    failures++
+  } else {
+    console.log(`换底图：面板 → 关键帧重排成功，盒子高度 ×${ratio.toFixed(3)}（换底图后无需刷新）`)
+  }
+}
+}
+
+console.log('')
 if (failures > 0) {
   console.log(`${failures} 处不符合预期`)
   process.exitCode = 1
 } else {
-  console.log(summary.join('   |   '))
-  console.log('比允许下限更小的档位按预期截断，并显示淡出提示')
+  for (const line of plateSummaries) console.log(line)
 }

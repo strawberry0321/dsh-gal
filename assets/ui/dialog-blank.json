@@ -1,0 +1,34 @@
+{
+  "_comment": "自带的空白对话框底图（assets/ui/dialog-blank.png）的几何描述：纯白面板，没有任何 logo，所以不裁切、图形区也不再让出右下角。设定面板的「空白底图」按钮就是把它复制成 ui/dialog.png + ui/dialog.json。",
+  "_fields": {
+    "image": "底图尺寸，必须和 png 实际像素一致",
+    "crop": "显示原图的哪一块（0~1 比例）。x/y 是左上角，w/h 是宽高",
+    "inset": "文字区域相对裁切后画面四周的内边距（0~1 比例）",
+    "footer.heightRatio": "底部（余额/花费）占文字区高度的比例",
+    "footer.maxWidthRatio": "底部文字最多横向占用多少",
+    "radius": "圆角像素（由 CSS 施加在对话框元素上）",
+    "logoShare": "图形区最多用掉文字区高度的几分之几；底图右下角有 logo 时用 0.72"
+  },
+  "image": {
+    "width": 1200,
+    "height": 700
+  },
+  "crop": {
+    "x": 0,
+    "y": 0,
+    "w": 1,
+    "h": 1
+  },
+  "inset": {
+    "left": 0.06,
+    "right": 0.06,
+    "top": 0.09,
+    "bottom": 0.07
+  },
+  "footer": {
+    "heightRatio": 0.42,
+    "maxWidthRatio": 0.9
+  },
+  "radius": 12,
+  "logoShare": 1
+}
