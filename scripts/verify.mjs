@@ -1013,6 +1013,69 @@ section('12b. Replacing the dialogue plate')
   })
 }
 
+section('12c. Replaced pack files must not keep their cached URL')
+{
+  const { createPackRegistry } = await import('../lib/packs.js')
+  const SPRITE = '/dsh-gal/asset/sprite'
+  const VOICE = '/dsh-gal/asset/voice'
+
+  await check('/api/next hands out a versioned URL for art and audio', async () => {
+    const res = await callRoute(route('/dsh-gal/api/next'), '/dsh-gal/api/next', {
+      query: { spritePack: 'neri', voicePack: 'neri' },
+    })
+    const data = jsonOf(res)
+    assert.match(data.sprite.url, /^\/dsh-gal\/asset\/sprite\?pack=[^&]+&file=[^&]+&v=\d+-\d+$/, data.sprite.url)
+    assert.match(data.voice.url, /^\/dsh-gal\/asset\/voice\?pack=[^&]+&file=[^&]+&v=\d+-\d+$/, data.voice.url)
+  })
+
+  await check('the version changes when the file behind it does', async () => {
+    // The regression: a pack's files were replaced (mirrored artwork, same file
+    // names) and the widget kept drawing the old pictures — the browser had the
+    // URL cached for a week and nothing about the URL had changed.
+    const dir = path.join(TMP_HOME, 'version-probe', 'packs', 'probe')
+    fs.mkdirSync(path.join(dir, 'sprites'), { recursive: true })
+    const file = path.join(dir, 'sprites', 'a.png')
+    const plate = fs.readFileSync(path.join(ROOT, 'assets/ui/dialog-blank.png'))
+    fs.writeFileSync(file, plate)
+    const roots = [path.join(TMP_HOME, 'version-probe', 'packs')]
+    const registry = createPackRegistry({ roots })
+    const first = registry.pickSprite(registry.get('probe'), '')
+    fs.writeFileSync(file, Buffer.concat([plate, Buffer.alloc(16)]))
+    registry.invalidate()
+    const second = registry.pickSprite(registry.get('probe'), '')
+    assert.match(String(first.version), /^\d+-\d+$/)
+    assert.notEqual(second.version, first.version, 'the stamp did not move after the file changed')
+    fs.rmSync(path.join(TMP_HOME, 'version-probe'), { recursive: true, force: true })
+  })
+
+  await check('only a versioned request may be cached', async () => {
+    const plain = await callRoute(route(SPRITE), SPRITE, { query: { pack: 'neri', file: 'large_neri_01face.png' } })
+    assert.equal(plain.status, 200)
+    assert.equal(plain.headers['Cache-Control'], 'no-store', 'a name-only URL must never be pinned in the browser')
+    const versioned = await callRoute(route(SPRITE), SPRITE, {
+      query: { pack: 'neri', file: 'large_neri_01face.png', v: '1-2' },
+    })
+    assert.match(versioned.headers['Cache-Control'], /max-age=604800/, 'a versioned URL is the one worth caching')
+    const voice = await callRoute(route(VOICE), VOICE, { query: { pack: 'neri', file: 'ner0001.wav' } })
+    assert.equal(voice.headers['Cache-Control'], 'no-store')
+  })
+
+  await check('/api/packs reports the default art version', async () => {
+    const data = jsonOf(await callRoute(route('/dsh-gal/api/packs'), '/dsh-gal/api/packs'))
+    const neri = data.spritePacks.find((p) => p.id === 'neri')
+    assert.ok(neri, 'the shipped pack is missing')
+    assert.match(String(neri.defaultSpriteVersion), /^\d+-\d+$/, 'the panel needs it to reload the default art')
+  })
+
+  await check('reverting to the default art carries the version', () => {
+    const clientSource = fs.readFileSync(path.join(ROOT, 'lib/client.js'), 'utf8')
+    const from = clientSource.indexOf('function revertToDefaultSprite')
+    const revert = clientSource.slice(from, clientSource.indexOf('async function roll(', from))
+    assert.match(revert, /pack\.defaultSpriteVersion/, 'the revert path must use the stamp')
+    assert.match(revert, /&file=\$\{encodeURIComponent\(file\)\}\$\{version\}/, 'the stamp must reach the URL')
+  })
+}
+
 section('13. Hidden UI must not swallow clicks')
 {
   // Regression guard. Both the settings panel and the gear button are laid out
