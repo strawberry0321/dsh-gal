@@ -54,7 +54,7 @@
 ## 两类自检
 
 ```powershell
-node scripts/verify.mjs        # 156 项端到端自检
+node scripts/verify.mjs        # 161 项端到端自检
 node scripts/layout-probe.mjs  # 真实浏览器排版探针（无浏览器时自动跳过）
 npm test                       # 两个一起跑
 ```
@@ -91,7 +91,7 @@ dsh-gal/
 │       ├── README.md         # 包格式说明
 │       └── neri/             # 内置示例包：pack.json / script.csv / 18 张立绘 / 405 条语音
 └── scripts/
-    ├── verify.mjs            # 156 项端到端自检
+    ├── verify.mjs            # 161 项端到端自检
     ├── layout-probe.mjs      # 真实浏览器排版探针
     ├── make-blank-plate.mjs  # 生成自带的空白底图（png + json）
     └── mirror-sprites.mjs    # 无损左右镜像一整套立绘（写完逐像素回验）

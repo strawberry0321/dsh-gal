@@ -1,6 +1,6 @@
 {
   "name": "dsh-gal",
-  "version": "2.2.0",
+  "version": "2.2.1",
   "description": "dsh-gal —— DeepSeek Harness 的立绘挂件：实时显示余额与今日消耗、每轮对话结束结算 token 与花费、点击立绘随机播语音并逐字显示台词，立绘包与语音包都能换",
   "keywords": [
     "dsh",

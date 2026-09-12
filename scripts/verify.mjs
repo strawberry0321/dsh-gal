@@ -795,6 +795,57 @@ section('8c. Voice draw order (shuffle bag) and weights')
   })
 }
 
+section('8d. Voices are loaded with fetch, not by the media element')
+{
+  const css = fs.readFileSync(path.join(ROOT, 'lib/client.js'), 'utf8')
+  const bytes = css.slice(css.indexOf('function audioBytesFor'), css.indexOf('function warmClickSound'))
+  const play = css.slice(css.indexOf('function startVoiceAudio'), css.indexOf('function playClick'))
+
+  await check('the bytes come from fetch, played as a blob', () => {
+    // Measured on a real session: three <audio> elements sat `stalled` for ten
+    // seconds while every `/api/turn` poll answered in 1-3ms, and then all three
+    // became playable in the same instant. Media requests lose that race; fetch
+    // does not, so the bytes are fetched here and handed over as an object URL.
+    assert.match(bytes, /fetch\(url, \{ cache: 'force-cache' \}\)/, 'the bytes must be fetched')
+    assert.match(bytes, /URL\.createObjectURL\(blob\)/, 'and played from a blob')
+    assert.match(bytes, /URL\.revokeObjectURL/, 'object URLs must be released again')
+    assert.ok(!/new Audio\(url\)/.test(play), 'the raw url must not be handed to a media element first')
+    assert.match(play, /new Audio\(src\)/, 'the element plays the blob (or the url as a fallback)')
+  })
+
+  await check('a voice that never loads is dropped, never played late', () => {
+    // The reported symptom had a second half: ten seconds later the queued clip
+    // played by itself, into a box that had moved on.
+    assert.match(css, /const VOICE_READY_TIMEOUT_MS = \d+/, 'there must be a patience limit')
+    assert.match(css, /语音迟迟没有加载出来/, 'and it must say so when it gives up')
+    const give = css.slice(css.indexOf('function playVoice'), css.indexOf('function playClick'))
+    assert.match(give, /voiceToken\+\+/, 'giving up must invalidate the pending line')
+    assert.match(css, /function stopVoice\(\)[\s\S]{0,260}voiceToken\+\+/, 'superseding a line invalidates it too')
+  })
+
+  await check('a failed voice says why instead of going quiet', () => {
+    // Every failure used to be swallowed by an empty catch, which is what made
+    // this take a probe to diagnose.
+    assert.match(play, /console\.warn\(`\[dsh-gal\] 语音播放被拒绝/)
+    assert.match(play, /语音解码或加载失败/)
+    assert.match(bytes, /语音字节读取失败/)
+    assert.ok(!/catch \{\s*\/\/ Autoplay restrictions/.test(css), 'the old silent catch is gone')
+  })
+
+  await check('the line is prefetched when it is drawn', () => {
+    // The first click after a fresh page load is the one that used to arrive
+    // silent, so the bytes must start loading at boot rather than at click time.
+    assert.match(css, /if \(data\.voice\.url\) audioBytesFor\(data\.voice\.url\)/)
+    assert.match(css, /warmClickSound\(\)\n    await roll\(false\)/, 'the click sound is warmed at boot too')
+  })
+
+  await check('polling stops while the window is hidden', () => {
+    // Every poll takes a connection the audio may need.
+    const poll = css.slice(css.indexOf('async function pollTurn'), css.indexOf('async function refreshState'))
+    assert.match(poll, /if \(document\.hidden\) return/)
+  })
+}
+
 section('9. Balance + spend')
 await check('/api/state degrades cleanly without a key', async () => {
   const res = await callRoute(route('/dsh-gal/api/state'), '/dsh-gal/api/state')
@@ -1388,9 +1439,10 @@ section('14. Dialogue box auto-hide')
     assert.match(css, /if \(!holdLatched && voiceFinished\) scheduleAutoHide\(\)/, 'typing must wait for the voice')
     assert.match(css, /if \(!holdLatched && typingFinished\) scheduleAutoHide\(\)/, 'the voice must wait for the text')
     // The audio element has to report back, with a safety net for streams that
-    // never fire `ended`.
+    // never fire `ended`. The error path now says why it failed before releasing
+    // the gate — a silent catch here is what made the audio bug invisible.
     assert.match(css, /addEventListener\('ended', noteVoiceFinished/)
-    assert.match(css, /addEventListener\('error', noteVoiceFinished/)
+    assert.match(css, /addEventListener\(\s*'error',\s*\(\) => \{[\s\S]{0,200}noteVoiceFinished\(\)/)
     assert.match(css, /voiceFallbackTimer = setTimeout\(noteVoiceFinished/)
     // And the typewriter must hand over to the gate rather than hiding directly.
     assert.match(css, /noteTypingFinished\(\)\n\s+return/, 'typing completion must not hide by itself')
