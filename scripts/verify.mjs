@@ -901,6 +901,144 @@ section('8e. Sprites and plates are drawn through the byte cache too')
   })
 }
 
+section('8f. Voice ↔ motion binding (a clip may name its own art)')
+{
+  const { createPackRegistry, webpSize, pngSizeOfFile } = await import('../lib/packs.js')
+  const packRoot = path.join(TMP_HOME, 'dsh-gal', 'packs')
+  const made = []
+
+  /**
+   * Minimal image headers, byte for byte to the spec, so the *reader* is what is
+   * under test: an animated WebP stores its canvas in VP8X, a still one in the
+   * VP8 (lossy) or VP8L (lossless) frame header.
+   */
+  const header = (fourcc, fill) => {
+    const buf = Buffer.alloc(40)
+    buf.write('RIFF', 0, 'latin1')
+    buf.writeUInt32LE(32, 4)
+    buf.write('WEBP', 8, 'latin1')
+    buf.write(fourcc, 12, 'latin1')
+    buf.writeUInt32LE(10, 16)
+    fill(buf)
+    return buf
+  }
+  const vp8x = (w, h) =>
+    header('VP8X', (buf) => {
+      buf[20] = 0x02 // animation flag
+      buf.writeUIntLE(w - 1, 24, 3)
+      buf.writeUIntLE(h - 1, 27, 3)
+    })
+  const vp8 = (w, h) =>
+    header('VP8 ', (buf) => {
+      buf[23] = 0x9d
+      buf[24] = 0x01
+      buf[25] = 0x2a // the lossy start code
+      buf.writeUInt16LE(w & 0x3fff, 26)
+      buf.writeUInt16LE(h & 0x3fff, 28)
+    })
+  const vp8l = (w, h) =>
+    header('VP8L', (buf) => {
+      buf[20] = 0x2f
+      buf.writeUInt32LE(((w - 1) & 0x3fff) | (((h - 1) & 0x3fff) << 14), 21)
+    })
+
+  /** A pack whose art is named after its clips: `sigu_drama_0001` ↔ `sigu_drama_0001`. */
+  const makePaired = (id, clips, { sprites = true, voices = true } = {}) => {
+    const dir = path.join(packRoot, id)
+    made.push(dir)
+    fs.mkdirSync(path.join(dir, 'sprites'), { recursive: true })
+    fs.mkdirSync(path.join(dir, 'voices'), { recursive: true })
+    for (const clip of clips) {
+      if (sprites) fs.writeFileSync(path.join(dir, 'sprites', `${clip}.webp`), vp8x(600, 900))
+      if (voices) fs.writeFileSync(path.join(dir, 'voices', `${clip}.ogg`), Buffer.from('OggS____'))
+    }
+    return dir
+  }
+  const clean = () => {
+    for (const dir of made) fs.rmSync(dir, { recursive: true, force: true })
+    made.length = 0
+  }
+
+  // Every pack this section asks the *route* about is written before the first
+  // request: the host caches its pack list for two seconds, and a pack created
+  // inside that window is simply not there yet (the request falls back to the
+  // configured pack and the check would measure the wrong thing).
+  makePaired('paired', ['sigu_drama_0001'])
+  makePaired('art-only', ['sigu_drama_0002'], { voices: false })
+  makePaired('voice-only', ['sigu_drama_0002'], { sprites: false })
+  const partialDir = makePaired('partial', ['sigu_drama_0003'], { voices: false })
+  fs.writeFileSync(path.join(partialDir, 'voices', 'other0001.ogg'), Buffer.from('OggS____'))
+  const settle = () => new Promise((resolve) => setTimeout(resolve, 2100))
+
+  await check('a WebP canvas is read from its header', () => {
+    // Without this the animated art reported no size and the box fell back to a
+    // 1:1 aspect: every frame of a 600x900 sprite was squashed into a square.
+    assert.deepEqual(webpSize(vp8x(600, 900)), { w: 600, h: 900 })
+    assert.deepEqual(webpSize(vp8(320, 240)), { w: 320, h: 240 })
+    assert.deepEqual(webpSize(vp8l(1024, 512)), { w: 1024, h: 512 })
+    assert.equal(webpSize(Buffer.alloc(8)), null, 'a short buffer must not throw')
+    assert.equal(webpSize(Buffer.alloc(40)), null, 'all-zero bytes are not a WebP')
+    const file = path.join(TMP_HOME, 'size-probe.webp')
+    fs.writeFileSync(file, vp8x(600, 900))
+    assert.deepEqual(pngSizeOfFile(file), { w: 600, h: 900 }, 'the file reader must use it too')
+    fs.rmSync(file, { force: true })
+  })
+
+  await check('the binding survives a pack that only pairs some of its lines', async () => {
+    // A half-finished pack must not lose its random frames: the lines it does name
+    // are bound, the rest fall through.
+    const registry = createPackRegistry({ roots: [packRoot] })
+    const partial = registry.get('partial')
+    assert.equal(registry.pairedSprite(partial, 'sigu_drama_0003').file, 'sigu_drama_0003.webp')
+    assert.equal(registry.pairedSprite(partial, 'other0001'), null, 'an unnamed clip must not match')
+    assert.equal(registry.pairedSprite(partial, 'sigu_drama_9999'), null, 'an unknown clip must not match')
+    assert.ok(registry.pickSprite(partial, ''), 'and the random draw must still have frames')
+  })
+
+  await check('a pack whose art is not named after its clips is untouched', async () => {
+    // Zero-impact is the whole licence for this feature: neri predates it and
+    // must still draw a random frame.
+    const registry = createPackRegistry({ roots: [path.join(ROOT, 'assets', 'packs'), packRoot] })
+    const neri = registry.get('neri')
+    const clip = neri.voices[0].replace(/\.[^.]+$/, '')
+    assert.equal(registry.pairedSprite(neri, clip), null, 'a legacy pack must pair nothing')
+    assert.equal(registry.pairedSprite(null, clip), null, 'and a missing pack must not throw')
+    await settle()
+    const data = jsonOf(
+      await callRoute(route('/dsh-gal/api/next'), '/dsh-gal/api/next', {
+        query: { spritePack: 'neri', voicePack: 'neri' },
+      }),
+    )
+    assert.ok(data.sprite && data.sprite.file, 'the random draw must still answer')
+    assert.ok(neri.sprites.includes(data.sprite.file), 'and it must be one of that pack own frames')
+    assert.ok(!data.sprite.file.startsWith(data.voice.clip), 'this pack has no such convention')
+  })
+
+  await check('/api/next shows the art named after the line it drew', async () => {
+    const data = jsonOf(
+      await callRoute(route('/dsh-gal/api/next'), '/dsh-gal/api/next', {
+        query: { spritePack: 'paired', voicePack: 'paired' },
+      }),
+    )
+    assert.equal(data.voice.clip, 'sigu_drama_0001')
+    assert.equal(data.sprite.file, 'sigu_drama_0001.webp', 'the line must bring its own frame')
+    assert.deepEqual(data.sprite.size, { w: 600, h: 900 })
+  })
+
+  await check("a voice pack can drive another pack's art", async () => {
+    // "A's art + B's voice" keeps working: the lookup happens in the *sprite*
+    // pack, using the clip the *voice* pack drew.
+    const data = jsonOf(
+      await callRoute(route('/dsh-gal/api/next'), '/dsh-gal/api/next', {
+        query: { spritePack: 'art-only', voicePack: 'voice-only' },
+      }),
+    )
+    assert.equal(data.voice.clip, 'sigu_drama_0002')
+    assert.equal(data.sprite.file, 'sigu_drama_0002.webp', "B's clip must find A's art")
+    clean()
+  })
+}
+
 section('9. Balance + spend')
 await check('/api/state degrades cleanly without a key', async () => {
   const res = await callRoute(route('/dsh-gal/api/state'), '/dsh-gal/api/state')

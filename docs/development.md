@@ -51,19 +51,21 @@
 
 素材路由只返回扫描到的文件名，路径穿越（`../`）在结构上就不可能。
 
-## 三类自检
+## 四类自检
 
 ```powershell
-node scripts/verify.mjs              # 165 项端到端自检
+node scripts/verify.mjs              # 170 项端到端自检
 node scripts/layout-probe.mjs        # 真实浏览器排版探针（无浏览器时自动跳过）
 node scripts/sprite-starve-probe.mjs # 真实浏览器「图片请求被饿死」探针
-npm test                             # 前两个一起跑
+node scripts/binding-selftest.mjs    # 语音 ↔ 动作绑定，跑在已装的真实资源包上
+npm test                             # 前两个 + binding-selftest
 ```
 
 * **`verify.mjs`**：用一个假的 Cordis 上下文启动真实宿主插件，把每个 HTTP 路由真实调用一遍，
   并用临时 `DSH_HOME` 保证不碰实际配置。覆盖 PNG 裁切、CSV 解析、定价、全部路由、用量记账、
   档位与配置迁移、隐形 UI 不吃点击、控件单位一致性、没有内容表的语音包、换底图全流程、
-  中英日三种包目录名、素材 URL 版本号、语音洗牌池与 weights.json、字节缓存（fetch → blob）、BOM 检查等。
+  中英日三种包目录名、素材 URL 版本号、语音洗牌池与 weights.json、字节缓存（fetch → blob）、
+  语音↔动作同名配对（含 WebP 头解析与旧包不受影响）、BOM 检查等。
 * **`layout-probe.mjs`**：把真实的 `client.js` 装进无头 Edge/Chrome，驱动真实档位按钮逐档量
   实际 DOM，**自带底图与空白底图各量一遍**（是否放得下、是否居中、文字颜色、字号上限，
   以及空白底图的图形区是否真的用满了整块）；每遍最后再走一次设定面板的换底图流程
@@ -73,6 +75,9 @@ npm test                             # 前两个一起跑
   再用真实指针事件点击立绘、真实下拉框换包，从 canvas 读回画面颜色，确认启动、点击换图、
   设定换包三条路径都还能换图。附带 `DSG_PROBE_CLIENT=<file>` 可以换成任意版本源码跑，
   用来确认这个探针真的能抓到这个 bug。
+* **`binding-selftest.mjs`**：不造假包，直接读 `~/.dsh/dsh-gal/packs` 里**真实**的包：
+  动画 WebP 的尺寸要从文件头读出来（不能退化成 1:1）、配对命中的那张图必须真的能读、
+  没配对的旧包必须仍然走随机抽。幂等，随便跑。
 
 ## 目录结构
 
@@ -85,7 +90,7 @@ dsh-gal/
 ├── lib/
 │   ├── index.js              # 宿主：路由、余额/用量、每轮结算、index 注入
 │   ├── client.js             # 浏览器：挂件 UI、拖拽、设定面板、对话框、打字机
-│   ├── packs.js              # 立绘包 / 语音包扫描、权重、洗牌池抽取
+│   ├── packs.js              # 立绘包 / 语音包扫描、权重、洗牌池抽取、语音↔动作同名配对
 │   ├── csv.js                # 台词对照表解析（支持跨行引号字段）
 │   ├── pricing.js            # DeepSeek 官方定价 + 峰谷时段
 │   ├── usage.js              # 余额接口 + 差额记账
@@ -97,9 +102,10 @@ dsh-gal/
 │       ├── README.md         # 包格式说明
 │       └── neri/             # 内置示例包：pack.json / script.csv / 18 张立绘 / 405 条语音
 └── scripts/
-    ├── verify.mjs            # 165 项端到端自检
+    ├── verify.mjs            # 170 项端到端自检
     ├── layout-probe.mjs      # 真实浏览器排版探针
     ├── sprite-starve-probe.mjs # 图片请求被饿死时立绘仍要能换
+    ├── binding-selftest.mjs  # 真实资源包上的语音↔动作配对自检
     ├── make-blank-plate.mjs  # 生成自带的空白底图（png + json）
     └── mirror-sprites.mjs    # 无损左右镜像一整套立绘（写完逐像素回验）
 ```

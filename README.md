@@ -19,6 +19,7 @@
 | 今日已用 | 优先官方用量接口；没有平台令牌时用「余额差额记账」推算 |
 | 每轮消耗 | 监听会话事件流，按 `(会话, 轮次)` 聚合真实 usage，对话结束即结算（**重启后的第一条也会弹**） |
 | 点击立绘 | 随机语音 + 随机立绘 + 台词以打字机效果逐字显示、居中（字号自适应，短句最多 28px） |
+| 语音 ↔ 动作绑定 | 立绘与语音**同名**时（`sigu_0001.webp` ↔ `sigu_0001.ogg`）播哪句就显示哪句的动作，动图直接用动画 WebP；没有同名素材的包（含全部旧包）行为不变，仍随机抽 |
 | 语音顺序 | 默认**洗牌池**：一轮里每条台词各出现一次，全部放过才重洗，短期内不会重复；可切成**纯随机** |
 | 没有内容表时 | 该语音**没有台词可显示**，对话框改为显示「余额 / 今日已用」；语音与随机立绘照常 |
 | 点击对话框 | 整块切成「余额 / 今日已用」，并把消失倒计时重置为 `dialogHoldSeconds`（默认 3 秒，**无音效**） |
@@ -140,13 +141,26 @@ dsh plugin --profile desktop remove dsh-gal
 | **Mashiro 精简版** | <img src="assets/characters/mashiro.png" width="200" alt="Mashiro 默认立绘"> | [Releases](https://github.com/strawberry0321/dsh-gal/releases/latest) 的 `mashiro-pack.zip` |
 | **noir音效** | <img src="assets/characters/noir.png" width="200" alt="noir 默认立绘"> | [Releases](https://github.com/strawberry0321/dsh-gal/releases/latest) 的 `noir-pack.zip` |
 | **Karuha** | <img src="assets/characters/karuha.png" width="200" alt="Karuha 默认立绘"> | [Releases](https://github.com/strawberry0321/dsh-gal/releases/latest) 的 `karuha-pack.zip` |
+| **時雨（Shigure）** | <img src="assets/characters/shigure.png" width="200" alt="時雨 默认立绘"> | [Releases](https://github.com/strawberry0321/dsh-gal/releases/latest) 的 `shigure-pack.zip` |
 
 下载解压到 `%USERPROFILE%\.dsh\dsh-gal\packs\`，刷新页面即可在设定面板的「立绘包 / 语音包」里选用。
+
+`shigure-pack.zip` 是**动画立绘**：89 段动作与语音同名配对，点击立绘时播哪句就演哪句（逐帧渲染的
+动画 WebP，口型跟语音走）。素材派生自 Nekopara Vol.0，**仅供自用**。
 
 **Mashiro 有两份**：
 
 * `mashiro-pack.zip` —— **精简版**（推荐）：37 张立绘 + 135 条语音，台词逐条筛过。
 * `mashiro-pack-full.zip` —— 完整版：**原台词过于伤感，不建议使用**，296 条语音原样留存。
   包 id 是 `Mashiro-full`，和精简版可以同时装，在设定面板里分开选。
+
+## 更新
+
+**2.3.1** —— 立绘与语音可以**同名配对**了：播哪句就显示那句的动作（动画 WebP、GIF 都能用），
+旧资源包行为完全不变；新增角色包 `shigure-pack.zip`（時雨，89 段动作 + 90 条语音）。
+
+**2.2.2** —— 修掉「新建对话页点立绘，语音响但立绘不换、设定里换包也不生效」。
+
+更早的版本见 [Releases](https://github.com/strawberry0321/dsh-gal/releases)。
 
 
