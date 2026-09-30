@@ -65,6 +65,19 @@
 结构化行的种类是固定的六种（`global` / `script` / `script-src` / `script-preload` / `style` / `html`），
 遇到未知种类宿主会直接抛错，所以两条通道要按上面的分工来用。
 
+### 现场诊断：客户端到底有没有在跑
+
+插件在官方桌面端「不显示」时，先分清是**没注入**还是**注入了但画不出来**。
+唯一可自动化的硬指标：客户端每 60 秒轮询 `/api/state`，宿主因此会刷新余额并重写用量账本
+（`%USERPROFILE%\.dsh\.dsh-gal-usage.json`）。**静默**（不发消息）观察这个文件的 mtime：
+
+```powershell
+node scripts/desktop-liveness-check.mjs 90   # 90 秒内账本动过 = 客户端脚本真的在跑
+```
+
+账本完全不动 = 脚本没有被加载，那时再看 `dsh --profile desktop --dump-config | Select-String dsh-gal`
+（有没有装到应用实际使用的 profile）以及**是不是完全重启过**（注入表在应用启动时冻结）。
+
 ## 四类自检
 
 ```powershell
@@ -116,27 +129,41 @@ dsh-gal/
 │       ├── README.md         # 包格式说明
 │       └── neri/             # 内置示例包：pack.json / script.csv / 18 张立绘 / 405 条语音
 └── scripts/
-    ├── verify.mjs            # 170 项端到端自检
+    ├── verify.mjs            # 174 项端到端自检
     ├── layout-probe.mjs      # 真实浏览器排版探针
     ├── sprite-starve-probe.mjs # 图片请求被饿死时立绘仍要能换
     ├── binding-selftest.mjs  # 真实资源包上的语音↔动作配对自检
+    ├── desktop-liveness-check.mjs # 官方桌面端里客户端脚本到底在不在跑
     ├── make-blank-plate.mjs  # 生成自带的空白底图（png + json）
     └── mirror-sprites.mjs    # 无损左右镜像一整套立绘（写完逐像素回验）
 ```
 
 ## 打包与发布
 
-发行方式是 **GitHub Releases**，带素材的完整包挂在 Release 上：
+发行方式仍是 **GitHub Releases**（带素材的完整包挂在 Release 上），但装插件不必再下 tgz ——
+官方客户端的插件页与 `dsh plugin add` 都接受**仓库地址 / 本地目录 / npm 包名**：
 
 ```powershell
-npm pack                          # 打全量包，约 119MB
+dsh plugin --profile desktop add https://github.com/strawberry0321/dsh-gal   # 仓库地址（推荐）
+dsh plugin --profile desktop add D:\gittttthub\dsh-gal                        # 本地目录（必须绝对路径）
+dsh plugin --profile desktop add C:\path\to\dsh-gal.tgz                       # 离线 tgz
+```
+
+spec 由 `dsh-plugin-manager` 的 `install-spec.js` 解析：绝对路径 → path/tarball，
+`github:`/`git+https://`/托管仓库 URL → git，裸包名 → 注册表（dsh-gal 不在 npm 上，别用这个）。
+git 与 path 两种都走 pnpm，安装后**完全重启**才装配宿主路由与注入表。
+
+发版时才需要打 tgz（`npm pack`，约 122MB）并作为 Release asset 上传：
+
+```powershell
+npm pack                          # 打全量包
 # 然后在 GitHub 上建 Release，把 tgz 作为 asset 传上去
 ```
 
-日常开发不必发版，`link:` 装源码目录即可（只建目录联接、不复制素材，改完刷新页面生效）：
+日常开发直接装本地目录即可（改 `lib/client.js` 刷新页面生效；改宿主侧要重启）：
 
 ```powershell
-dsh plugin --profile desktop add link:C:\path\to\dsh-gal
+dsh plugin --profile desktop add D:\path\to\dsh-gal
 ```
 
 * `package.json` 的 `files` 已包含 `lib`、`scripts`、`assets/**`、`cordis.patch.yml`、`docs`、

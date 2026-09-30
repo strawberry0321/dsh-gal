@@ -34,12 +34,14 @@
 
 **前置**：已在 DSH 里配置好 `DEEPSEEK_API_KEY` 凭据。
 
-到 **[Releases](https://github.com/strawberry0321/dsh-gal/releases/latest)** 下载 `dsh-gal.tgz`
-（不带版本号的那个，永远指向最新版），然后按本地文件安装：
+官方客户端的插件页（侧边栏 **插件**）和 `dsh plugin add` 都接受**仓库地址 / 本地目录 / npm 包名**，
+dsh-gal 用前两种（**没有发布到 npm**，所以直接输包名 `dsh-gal` 会去注册表找、装不到）：
 
-```powershell
-dsh plugin --profile desktop add C:\path\to\dsh-gal.tgz
-```
+| 方式 | 怎么装 |
+|---|---|
+| **仓库地址**（推荐，一行搞定） | 插件页输入 `https://github.com/strawberry0321/dsh-gal`，或命令行<br>`dsh plugin --profile desktop add https://github.com/strawberry0321/dsh-gal` |
+| **本地目录**（自己改了源码／离线） | `dsh plugin --profile desktop add D:\path\to\dsh-gal` —— **必须是绝对路径**，相对路径会被拒绝 |
+| **离线 tgz** | 从 [Releases](https://github.com/strawberry0321/dsh-gal/releases/latest) 下 `dsh-gal.tgz`（不带版本号的那个，永远指向最新版），再 `dsh plugin --profile desktop add C:\path\to\dsh-gal.tgz` |
 
 **必须完全重启 DSH Desktop**（托盘退出再启动，刷新页面不够）：宿主路由在进程启动时装配，
 而且官方桌面端的**注入表在应用启动时就被冻结**，刷新只会拿到同一份旧表，挂件不会出现。
@@ -52,6 +54,9 @@ dsh plugin --profile desktop add C:\path\to\dsh-gal.tgz
 ```powershell
 # 验证：配置树里应该出现这一行
 dsh --profile desktop --dump-config | Select-String dsh-gal
+
+# 挂件在不在跑（静默观察 90 秒，看用量账本有没有被客户端轮询刷新）
+node scripts\desktop-liveness-check.mjs 90
 
 # 卸载（会同时清掉 dependencies 和 bundles 两处记录）
 dsh plugin --profile desktop remove dsh-gal
@@ -156,6 +161,9 @@ dsh plugin --profile desktop remove dsh-gal
   包 id 是 `Mashiro-full`，和精简版可以同时装，在设定面板里分开选。
 
 ## 更新
+
+**安装方式**：官方客户端现在可以直接用**仓库地址**或**本地目录**安装（见上面的「安装」），
+不必再下 Release 的 tgz —— 仓库里就带着完整素材，装完完全重启即可。
 
 **2.3.2** —— 修掉「**官方桌面端（新 DSH）里挂件完全不显示**」：原来只走 `tapIndex` 注入，
 而官方桌面端不渲染 HTTP index（页面是打包好的静态文档），只认启动时冻结的**结构化注入行**，
