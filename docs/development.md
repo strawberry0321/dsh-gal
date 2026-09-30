@@ -51,6 +51,20 @@
 
 素材路由只返回扫描到的文件名，路径穿越（`../`）在结构上就不可能。
 
+### 客户端脚本怎么进到页面里（两条通道，缺一不可）
+
+| 页面形态 | index 从哪来 | 用哪条通道 |
+|---|---|---|
+| 官方桌面端（`dsh-app://app/`） | 打包好的静态 `dsh-web-frontend/dist/index.html` | **结构化注入行**：`ctx.on('webserver/index-inject', …)` 推 `{ kind: 'script-src', src: '/dsh-gal/client.js' }` |
+| web / HTTP（含 `npx dsh web`、社区桌面端） | 宿主 `renderIndex()` 渲染 | `ctx.webServer.tapIndex(html => …)` 插 `<script defer src=…>` |
+
+官方桌面端的注入表由 `collectIndexInjections()` 在**宿主启动时**采集一次、经 IPC 随 boot payload
+冻结下发，页面刷新不会重新采集 —— 所以装完必须**完全重启应用**。
+注意 `renderIndex()` 的顺序是「先渲染结构化行、再跑 tap」：HTTP 形态下 `script-src` 行已经被渲染成
+真正的 `<script src>` 标签，tap 必须**只在没有该标签时**才补一个（否则同一份脚本会加载两次）。
+结构化行的种类是固定的六种（`global` / `script` / `script-src` / `script-preload` / `style` / `html`），
+遇到未知种类宿主会直接抛错，所以两条通道要按上面的分工来用。
+
 ## 四类自检
 
 ```powershell

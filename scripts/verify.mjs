@@ -295,7 +295,9 @@ await check('apply() registers its routes and index injection', () => {
   mod.apply(harness.ctx)
   assert.ok(harness.routes.size >= 10, `only ${harness.routes.size} routes`)
   assert.equal(harness.indexTaps.length, 1)
-  assert.equal(harness.listeners.size, 2)
+  // session/event + session/disposed + the structured index-inject row.
+  assert.equal(harness.listeners.size, 3)
+  assert.ok(harness.listeners.has('webserver/index-inject'), 'the Desktop reads rows, not taps')
   assert.equal(harness.effects.length, 1)
 })
 await check('creates the user drop-folders on first run', () => {
@@ -319,6 +321,30 @@ await check('injects the client script into the index document', () => {
   assert.ok(html.indexOf('/dsh-gal/client.js') < html.indexOf('</body>'))
   // Idempotent: a second pass must not add a duplicate tag.
   assert.equal(harness.indexTaps[0](html), html)
+})
+
+await check('also hands the Desktop a structured row, which taps cannot reach', () => {
+  // The official Desktop app never calls `renderIndex`: its window is a static
+  // document out of the packaged frontend, and the only thing spliced into it is
+  // the boot payload's `webserver/index-inject` table. Without this row the
+  // client half was never loaded there at all — no widget, however often the app
+  // was restarted, while every route answered 200.
+  const emit = harness.listeners.get('webserver/index-inject')
+  assert.equal(typeof emit, 'function')
+  const table = []
+  emit(table)
+  assert.deepEqual(table, [{ kind: 'script-src', placement: 'body', src: '/dsh-gal/client.js' }])
+  // The host may collect the table more than once; a second row would boot the
+  // widget twice.
+  emit(table)
+  assert.equal(table.length, 1, 'the row must be added once')
+  // Somebody else's row must survive untouched.
+  const foreign = [{ kind: 'global', name: 'x', value: 1 }]
+  emit(foreign)
+  assert.equal(foreign.length, 2)
+  assert.deepEqual(foreign[0], { kind: 'global', name: 'x', value: 1 })
+  // A table that is not an array must not throw into the host's collector.
+  emit(undefined)
 })
 
 const route = (p) => {
@@ -1036,6 +1062,41 @@ section('8f. Voice ↔ motion binding (a clip may name its own art)')
     assert.equal(data.voice.clip, 'sigu_drama_0002')
     assert.equal(data.sprite.file, 'sigu_drama_0002.webp', "B's clip must find A's art")
     clean()
+  })
+}
+
+section('8g. A widget that cannot start says so')
+{
+  const css = fs.readFileSync(path.join(ROOT, 'lib/client.js'), 'utf8')
+  const boot = css.slice(css.indexOf('function bootFailed'), css.indexOf('if (document.readyState'))
+
+  await check('every startup step is guarded, not just the bootstrap fetch', () => {
+    // The regression the diagnosis named: `root` is created hidden and only
+    // `renderAll()` reveals it, so a throw after the (already guarded) bootstrap
+    // fetch left an invisible widget with nothing in the console.
+    assert.match(boot, /async function boot\(\) \{\s*try \{\s*await start\(\)/, 'boot must guard the whole startup')
+    assert.match(boot, /catch \(err\) \{\s*bootFailed\(err\)/)
+    assert.match(boot, /async function start\(\)/)
+  })
+
+  await check('a failed start is logged and shown on screen', () => {
+    assert.match(boot, /console\.error\(`\[dsh-gal\] 挂件启动失败/)
+    assert.match(boot, /root\.style\.visibility = 'visible'/, 'the root must not stay invisible')
+    assert.match(boot, /showNotice\(`挂件启动失败/, 'the user has to see the reason')
+    // Best-effort: the failure path itself runs when something is already broken
+    // and must never throw a second error out of boot().
+    assert.equal((boot.match(/try \{/g) || []).length >= 3, true, 'logging and rendering are guarded too')
+  })
+
+  await check('a failed start hands the document back', () => {
+    // The guard is set before anything is mounted, so a first failure used to
+    // lock the document out: a host that injects the script twice never got a
+    // second chance.
+    assert.match(css, /if \(previous === true \|\| \(previous && previous\.failed !== true\)\) return/)
+    assert.match(css, /window\.__dshGalWidget = \{ failed: false \}/)
+    assert.match(boot, /window\.__dshGalWidget\.failed = true/)
+    // And the retry must not leave the previous half-built widget on screen.
+    assert.match(css, /for \(const stale of document\.querySelectorAll\('\.dsg-root'\)\) stale\.remove\(\)/)
   })
 }
 

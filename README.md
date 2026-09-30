@@ -41,7 +41,8 @@
 dsh plugin --profile desktop add C:\path\to\dsh-gal.tgz
 ```
 
-**必须重启 DSH Desktop**：宿主路由和注入脚本在进程启动时装配，只刷新页面不够。
+**必须完全重启 DSH Desktop**（托盘退出再启动，刷新页面不够）：宿主路由在进程启动时装配，
+而且官方桌面端的**注入表在应用启动时就被冻结**，刷新只会拿到同一份旧表，挂件不会出现。
 
 > **用网页端（`npx @deepseek-ai/dsh web`）的话**，把命令里的 `--profile desktop` 换成
 > `--profile web` —— 网页端读的是 `web` profile，装到 `desktop` 里网页端**看不到挂件**
@@ -155,6 +156,12 @@ dsh plugin --profile desktop remove dsh-gal
   包 id 是 `Mashiro-full`，和精简版可以同时装，在设定面板里分开选。
 
 ## 更新
+
+**2.3.2** —— 修掉「**官方桌面端（新 DSH）里挂件完全不显示**」：原来只走 `tapIndex` 注入，
+而官方桌面端不渲染 HTTP index（页面是打包好的静态文档），只认启动时冻结的**结构化注入行**，
+所以客户端脚本从未加载过（宿主各路由却全部 200）。现在**两条通道都挂**：
+结构化 `webserver/index-inject` 行给官方桌面端，`tapIndex` 给 web / HTTP 形式；顺带让
+启动失败不再静默（控制台 + 屏幕上都会说明原因）。
 
 **2.3.1** —— 立绘与语音可以**同名配对**了：播哪句就显示那句的动作（动画 WebP、GIF 都能用），
 旧资源包行为完全不变；新增角色包 `shigure-pack.zip`（時雨，89 段动作 + 90 条语音）。
