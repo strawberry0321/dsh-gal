@@ -52,8 +52,9 @@ dsh-gal 用前两种（**没有发布到 npm**，所以直接输包名 `dsh-gal`
 > **两端都想用就两端各装一次**；素材包、设置、余额记账是共用的（都在 `%USERPROFILE%\.dsh` 下）。
 
 ```powershell
-# 验证：配置树里应该出现这一行
-dsh --profile desktop --dump-config | Select-String dsh-gal
+# 验证：配置树里应该出现 dsh-gal（官方客户端把 desktop profile 独占管理，
+# 所以 `dsh --profile desktop --dump-config` 会被拒；直接看合成后的配置树即可）
+Select-String -Path "$env:USERPROFILE\.dsh\profiles\desktop\cordis.yml" -Pattern 'dsh-gal'
 
 # 挂件在不在跑（静默观察 90 秒，看用量账本有没有被客户端轮询刷新）
 node scripts\desktop-liveness-check.mjs 90

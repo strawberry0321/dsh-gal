@@ -152,6 +152,12 @@ dsh plugin --profile desktop add C:\path\to\dsh-gal.tgz                       # 
 spec 由 `dsh-plugin-manager` 的 `install-spec.js` 解析：绝对路径 → path/tarball，
 `github:`/`git+https://`/托管仓库 URL → git，裸包名 → 注册表（dsh-gal 不在 npm 上，别用这个）。
 git 与 path 两种都走 pnpm，安装后**完全重启**才装配宿主路由与注入表。
+绝对路径会被 pnpm 记成 `link:`，也就是**装着源码目录本身**（改 `lib/client.js` 刷新页面生效，
+改宿主侧要重启）；要一份快照就改用 tgz。
+
+官方客户端把 `desktop` profile 独占管理：`dsh plugin --profile desktop add|remove` 能用，
+但 `dsh --profile desktop --dump-config` 会被拒（`profile "desktop" is managed exclusively by the
+Electron application`），验证装没装上看 `%USERPROFILE%\.dsh\profiles\desktop\cordis.yml` 里的行。
 
 发版时才需要打 tgz（`npm pack`，约 122MB）并作为 Release asset 上传：
 
